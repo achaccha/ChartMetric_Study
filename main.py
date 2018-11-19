@@ -13,8 +13,11 @@ def main(argv=None):
     chart_type_opts = ['regional', 'viral']
     duration_opts = ['weekly', 'daily']
 
-    # specific한 날짜목록을 주었을 때, 그 부분 scraping하는 함수 
-
+    '''
+    TODO:
+    scraping when given a specific date
+    '''
+    
     # get arguments
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'harvwd', ['help', 'all', 'regional', 'viral', 'weekly', 'daily'])
@@ -41,11 +44,18 @@ def main(argv=None):
 
         else:
             assert False, 'unhandled option'
-
-    conn = DBManager.get_postgres()
-    #country_dict, date_dict = Extractor(chart_type_opts, duration_opts)
-    #Scraper(chart_type_opts, duration_opts, country_dict, date_dict)
-
     
+    country_dict = Extractor(chart_type_opts, duration_opts)
+    result = Scraper(chart_type_opts, duration_opts, country_dict)
+    
+    ''' 
+    result = [['6JjPBQfI2Y8nIjnm65X6Pw', 197, '11/08/2018', 'Global', 'regional', 'weekly'],\
+            ['2ZRo7axmMPeSVUvDbGkJah', 200, '11/08/2018', 'Global', 'regional', 'weekly'],\
+            ['6JjPBQfI2Y8nIjnm65X6Pw', 199, '11/08/2018', 'Global', 'regional', 'weekly']]
+    
+
+    DBManager(result)
+    '''
+
 if __name__ == "__main__":
     sys.exit(main())
