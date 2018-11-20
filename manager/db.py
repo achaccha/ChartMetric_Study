@@ -7,9 +7,10 @@ class DBManager:
     __postgres_store = None
 
     @classmethod
-    def __init__(cls, result):
+    def __init__(cls):
         conn = cls.get_postgres()
-        cls.insert_db(conn, result)
+        #return conn
+        #cls.insert_db(conn, result)
 
     @classmethod
     def __init_postgres(cls):
@@ -32,7 +33,8 @@ class DBManager:
         return cls.__postgres_store
 
     @classmethod
-    def insert_db(cls, conn, result):
+    def insert(cls, result):
+        conn = cls.__postgres_store
         cursor = conn.cursor()
 
         for item in result: 
@@ -43,22 +45,26 @@ class DBManager:
             chart_type = item[4]
             duration = item[5]
             
-            data = (spotify_track_id, rank, timestp, country, chart_type, duration,)
-            
+            insert_data = (spotify_track_id, rank, timestp, country, chart_type, duration,)
+
             insert_sql = "INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration) \
                 VALUES (%s, %s, %s, %s, %s, %s);"
-        
+            
+            cursor.execute(insert_sql, insert_data)
+            conn.commit()
+            '''
+            query_data = (rank, timestp, country, chart_type, duration,)
             query_sql = "SELECT COUNT(*) FROM spotify_chart \
-                WHERE spotify_track_id = %s and rank = %s and timestp = %s and country = %s and chart_type = %s and duration = %s;"
+                WHERE rank = %s and timestp = %s and country = %s and chart_type = %s and duration = %s;"
             
             # search duplicate
-            cursor.execute(query_sql, data)
+            cursor.execute(query_sql, query_data)
             records = cursor.fetchone()
              
             if records[0] == 0:
-                cursor.execute(insert_sql, data)
+                cursor.execute(insert_sql, insert_data)
                 conn.commit()
-
+            '''
         cursor.close()
 
     @classmethod
@@ -67,4 +73,9 @@ class DBManager:
         initialize_sql = "TRUNCATE TABLE spotify_chart restart identity;"
         cursor.execute(initialize_sql)
 
+        return True
+
+    @classmethod
+    def close_connection(cls):
+        cls.__postgres_store.close()
         return True

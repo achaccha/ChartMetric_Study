@@ -55,9 +55,11 @@ class Scraper:
 
     @classmethod
     def scraping(cls, chart_type, country_list, duration, result):		
-        
+        db = DBManager()
+        #country_list = ['sk']
+
         for country in country_list:
-            alert_msg = "*Scraping Start : {chart_type}_{country}_{duration}\n"\
+            alert_msg = "<<<<<Scraping Start : {chart_type}_{country}_{duration}>>>>>\n"\
                 .format(chart_type=chart_type, country=country, duration=duration) 
             cls.slack_alert(alert_msg)
             
@@ -68,7 +70,7 @@ class Scraper:
                 url = "https://spotifycharts.com/{chart_type}/{country}/{duration}/{date}"\
                     .format(chart_type=chart_type, country=country, duration=duration, date=date)
                 req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})                
-                
+
                 try:
                     webpage_byte = urlopen(req).read()
                     webpage = webpage_byte.decode('utf-8')
@@ -112,49 +114,21 @@ class Scraper:
                             except:
                                 continue
                 except HTTPError as e:
-                    alert_msg = '{country}_{date} : HTTPError!\n'.format(country=country, date=date)
+                    alert_msg = '###### {chart_type}/{country}/{duration}/{date} : HTTPError!\n'.format(chart_type=chart_type, country=country, duration=duration, date=date)
                     cls.slack_alert(alert_msg)
                     if e.getcode() == 500:
                         content = e.read()
                     else:
                         raise
 
-            alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Total result : {total}\n"\
-                .format(chart_type=chart_type, country=country, duration=duration, total=len(result)) 
+            alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {country_result}, Total result : {total}\n"\
+                .format(chart_type=chart_type, country=country, duration=duration, country_result=len(country_result), total=len(result)) 
             cls.slack_alert(alert_msg)
 
-            DBManager(country_result)
+            db.insert(country_result)
 
+        db.close_connection()
+        cls.slack_alert(" *** Finished!! \n")
+        
         return result
-
-    @classmethod
-    def renewDateList(cls, chart_type, country, duration, date_list):
-        url = "https://spotifycharts.com/{}/{}/{}/{}".format(chart_type, country, duration, 'latest')
-        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-
-        try:
-            webpage_byte = urlopen(req).read()
-            webpage = webpage_byte.decode('utf-8')
-            soup = BeautifulSoup(webpage, 'html.parser')
-            selects = soup.find_all('li', {'class':'selected'})
-            selects_list = [select['data-value'] for select in selects]
-            select_date = selects_list[len(selects_list)-1]
-            date_start_index = date_list.index(select_date)
-            date_list = date_list[date_start_index:]
     
-        except:
-            date_list = []
-            
-        return date_list
-
-    @classmethod
-    def showListInfo(cls, daily_list, weekly_list, country_list):
-        print(json.dumps(daily_list, indent=4))
-        print("Daily_list count : ", len(daily_list))
-        print("==========")
-        print(json.dumps(weekly_list, indent=4))
-        print("Weekly_list count : ", len(weekly_list))
-        print("==========")
-        print(json.dumps(country_list, indent=4))
-        print("Country_list count : ", len(country_list))
-        print("==========")

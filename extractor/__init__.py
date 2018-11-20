@@ -38,8 +38,10 @@ class Extractor:
                         country_list.append(country)
             except:
                 continue
-
+        
         country_list = list(set(country_list))
+        country_list.sort()
+
         return country_list
 
     @classmethod
@@ -66,6 +68,9 @@ class Extractor:
                     continue
         except:
             return date_list            
+        
+        date_list = list(set(date_list))
+        date_list.sort()
 
         return date_list
 
