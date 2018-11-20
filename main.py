@@ -45,17 +45,11 @@ def main(argv=None):
         else:
             assert False, 'unhandled option'
     
+    scraper = Scraper("spotify_chart")
     country_dict = Extractor(chart_type_opts, duration_opts)
-    result = Scraper(chart_type_opts, duration_opts, country_dict)
-    
-    ''' 
-    result = [['6JjPBQfI2Y8nIjnm65X6Pw', 197, '11/08/2018', 'Global', 'regional', 'weekly'],\
-            ['2ZRo7axmMPeSVUvDbGkJah', 200, '11/08/2018', 'Global', 'regional', 'weekly'],\
-            ['6JjPBQfI2Y8nIjnm65X6Pw', 199, '11/08/2018', 'Global', 'regional', 'weekly']]
-    
 
-    DBManager(result)
-    '''
+    #result = scraper.allData(chart_type_opts, duration_opts, country_dict)
+    latest_result = scraper.latestData(chart_type_opts, duration_opts, country_dict)
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -8,9 +8,7 @@ class DBManager:
 
     @classmethod
     def __init__(cls):
-        conn = cls.get_postgres()
-        #return conn
-        #cls.insert_db(conn, result)
+        conn = cls.getPostgres()
 
     @classmethod
     def __init_postgres(cls):
@@ -27,7 +25,7 @@ class DBManager:
         cls.__postgres_store = psycopg2.connect(connect_str)
 
     @classmethod
-    def get_postgres(cls):
+    def getPostgres(cls):
         if cls.__postgres_store == None:
             cls.__init_postgres()
         return cls.__postgres_store
@@ -52,6 +50,7 @@ class DBManager:
             
             cursor.execute(insert_sql, insert_data)
             conn.commit()
+            
             '''
             query_data = (rank, timestp, country, chart_type, duration,)
             query_sql = "SELECT COUNT(*) FROM spotify_chart \
@@ -68,7 +67,21 @@ class DBManager:
         cursor.close()
 
     @classmethod
-    def initialize_table(cls, conn):
+    def getCountryLatest(cls, country, chart_type, duration):
+        conn = cls.__postgres_store
+        cursor = conn.cursor()
+
+        query_sql = "SELECT timestp FROM spotify_chart \
+            WHERE country=%s, chart_type=%s, duration=%s ORDER BY id DESC LIMIT 1;"
+
+        query_data = (country, chart_type, duration,)
+
+        cursor.execute(query_sql, query_data)
+        records = cursor.fetchone()
+        print(records)
+
+    @classmethod
+    def initializeTable(cls, conn):
         cursor = conn.cursor()
         initialize_sql = "TRUNCATE TABLE spotify_chart restart identity;"
         cursor.execute(initialize_sql)
@@ -76,6 +89,6 @@ class DBManager:
         return True
 
     @classmethod
-    def close_connection(cls):
+    def closeConnection(cls):
         cls.__postgres_store.close()
         return True
