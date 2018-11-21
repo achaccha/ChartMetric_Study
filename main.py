@@ -12,15 +12,13 @@ def main(argv=None):
 
     chart_type_opts = ['regional', 'viral']
     duration_opts = ['weekly', 'daily']
-
-    '''
-    TODO:
-    scraping when given a specific date
-    '''
+    scrape_all_option = True
+    scrape_latest_option = False
+    scrape_confirm_option = False
     
     # get arguments
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'harvwd', ['help', 'all', 'regional', 'viral', 'weekly', 'daily'])
+        opts, args = getopt.getopt(sys.argv[1:], 'harvwdlc', ['help', 'all', 'regional', 'viral', 'weekly', 'daily', 'latest', 'confirm'])
     except getopt.GetoptError as err:
         print (err)
         sys.exit(1)
@@ -42,14 +40,27 @@ def main(argv=None):
         elif o in ('-d', '--daily'):
             duration_opts = ['daily']
 
+        elif o in ('-l', '--latest'):
+            scrape_all_option = False
+            scrape_latest_option = True
+
+        elif o in ('-c', '--confirm'):
+            scrape_all_option = False
+            scrape_confirm_option = True
         else:
             assert False, 'unhandled option'
     
-    scraper = Scraper("spotify_chart")
-    country_dict = Extractor(chart_type_opts, duration_opts)
+    scraper = Scraper()
+    extractor = Extractor()
 
-    result = scraper.allData(chart_type_opts, duration_opts, country_dict)
-    #latest_result = scraper.latestData(chart_type_opts, duration_opts, country_dict)
+    country_dict = extractor.extractCountryList(chart_type_opts, duration_opts)
+    
+    if scrape_all_option == True:
+        scraper.scrapeAllData(chart_type_opts, duration_opts, country_dict)
+    elif scrape_latest_option == True:
+        scraper.scrapeLatestData(chart_type_opts, duration_opts, country_dict)
+    elif scrape_confirm_option == True:
+        scraper.scrapeConfirm(chart_type_opts, duration_opts, country_dict)
 
 if __name__ == "__main__":
     sys.exit(main())

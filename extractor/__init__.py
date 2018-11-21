@@ -7,45 +7,61 @@ from bs4 import BeautifulSoup
 class Extractor:
 
     @classmethod
-    def __new__(cls, self, chart_type_opts, duration_opts):
-        country_dic = {}
-
+    def extractCountryList(cls, chart_type_opts, duration_opts):
         for chart_type in chart_type_opts:
             for duration in duration_opts:
                 country_key = chart_type+"_"+duration
-                country_dic[country_key] = cls.countryList(chart_type)
+                country_list = []
+
+                url="https://spotifycharts.com/{}/global/weekly/latest".format(chart_type)
+                req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+
+                webpage_byte = urlopen(req).read()
+
+                webpage = webpage_byte.decode('utf-8')
+                soup = BeautifulSoup(webpage, 'html.parser')
+
+                for child in soup.find("div",{"data-type":"country"}).children:
+                    try:
+                        country_tags = child.find_all('li')
+                        if country_tags:
+                            for country_tag in country_tags:
+                                country = country_tag['data-value']
+                                country_list.append(country)
+                    except:
+                        continue
+                
+                country_list = list(set(country_list))
+                country_list.sort()
+
+                country_dic[country_key] = country_list
 
         return country_dic
 
     @classmethod
-    def countryList(cls, chart_type):
-        country_list = []
-
-        url="https://spotifycharts.com/{}/global/weekly/latest".format(chart_type)
+    def extractCountryName(cls, chart_type, country, duration):
+        url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
         req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        country = None
+        try:
+            webpage_byte = urlopen(req).read()
 
-        webpage_byte = urlopen(req).read()
+            webpage = webpage_byte.decode('utf-8')
+            soup = BeautifulSoup(webpage, 'html.parser')
 
-        webpage = webpage_byte.decode('utf-8')
-        soup = BeautifulSoup(webpage, 'html.parser')
+            for child in soup.find("div",{"data-type":"country"}).children:
+                try:
+                    date_tag = child.find('li', {"class":"selected"})
+                    country = date_tag.text
+                except:
+                    continue
+        except:
+            return country
 
-        for child in soup.find("div",{"data-type":"country"}).children:
-       	    try:
-                country_tags = child.find_all('li')
-                if country_tags:
-                    for country_tag in country_tags:
-                        country = country_tag['data-value']
-                        country_list.append(country)
-            except:
-                continue
-        
-        country_list = list(set(country_list))
-        country_list.sort()
-
-        return country_list
+        return country
 
     @classmethod
-    def dateList(cls, chart_type, country, duration):
+    def extractDateList(cls, chart_type, country, duration):
         date_list = []
 
         url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
@@ -111,24 +127,4 @@ class Extractor:
 
         return date_list
 
-    @classmethod
-    def getCountryName(cls, chart_type, country, duration):
-        url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
-        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        country = None
-        try:
-            webpage_byte = urlopen(req).read()
-
-            webpage = webpage_byte.decode('utf-8')
-            soup = BeautifulSoup(webpage, 'html.parser')
-
-            for child in soup.find("div",{"data-type":"country"}).children:
-                try:
-                    date_tag = child.find('li', {"class":"selected"})
-                    country = date_tag.text
-                except:
-                    continue
-        except:
-            return country
-
-        return country
+    
