@@ -48,8 +48,8 @@ def main(argv=None):
     scraper = Scraper("spotify_chart")
     country_dict = Extractor(chart_type_opts, duration_opts)
 
-    #result = scraper.allData(chart_type_opts, duration_opts, country_dict)
-    latest_result = scraper.latestData(chart_type_opts, duration_opts, country_dict)
+    result = scraper.allData(chart_type_opts, duration_opts, country_dict)
+    #latest_result = scraper.latestData(chart_type_opts, duration_opts, country_dict)
 
 if __name__ == "__main__":
     sys.exit(main())

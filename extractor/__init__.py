@@ -111,4 +111,24 @@ class Extractor:
 
         return date_list
 
+    @classmethod
+    def getCountryName(cls, chart_type, country, duration):
+        url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
+        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        country = None
+        try:
+            webpage_byte = urlopen(req).read()
 
+            webpage = webpage_byte.decode('utf-8')
+            soup = BeautifulSoup(webpage, 'html.parser')
+
+            for child in soup.find("div",{"data-type":"country"}).children:
+                try:
+                    date_tag = child.find('li', {"class":"selected"})
+                    country = date_tag.text
+                except:
+                    continue
+        except:
+            return country
+
+        return country

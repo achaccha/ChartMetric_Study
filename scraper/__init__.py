@@ -10,13 +10,17 @@ CREATE TABLE spotify_chart (
 );
 '''
 
+import errno
 import json
 import os
 import sys
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
+
 from bs4 import BeautifulSoup
 from collections import OrderedDict
+
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from socket import error as SocketError
 
 from manager.db import DBManager
 from extractor import Extractor
@@ -85,6 +89,7 @@ class Scraper:
 
                         except:
                             continue
+
             except HTTPError as e:
                 alert_msg = '###### {chart_type}/{country}/{duration}/{date} : HTTPError!\n'.format(chart_type=chart_type, country=country, duration=duration, date=date)
                 cls.slackAlert(alert_msg)
@@ -93,7 +98,17 @@ class Scraper:
                     content = e.read()
                 else:
                     raise
-        
+
+            except SocketError as e:
+                alert_msg = '###### SocketError!\n'
+                cls.slackAlert(alert_msg)
+
+                if e.errno != errno.ECONNRESET:
+                    raise 
+                
+                print(e.getcode())
+
+
         return result, country_result
 
     @classmethod
@@ -116,7 +131,7 @@ class Scraper:
                         .format(chart_type=chart_type, country=country, duration=duration, country_result=len(country_result), total=len(result)) 
                     cls.slackAlert(alert_msg)
 
-                    #db.insert(country_result)
+                    db.insert(country_result)
 
                 db.closeConnection()
                 cls.slackAlert(" *** Finished!! \n")
@@ -137,7 +152,9 @@ class Scraper:
                         .format(chart_type=chart_type, country=country, duration=duration) 
                     cls.slackAlert(alert_msg)
                     
-                    previous_date = db.getCountryLatest(country, chart_type, duration)
+                    country_name = Extractor.getCountryName(chart_type, country, duration)
+                    previous_date = db.getCountryLatest(chart_type, country_name, duration)
+                    previous_date = str(previous_date)
                     date_list = Extractor.updateDateList(chart_type, country, duration, previous_date)
                     result, country_result = cls.scraping(chart_type, country, duration, date_list, result)
 
@@ -145,7 +162,7 @@ class Scraper:
                         .format(chart_type=chart_type, country=country, duration=duration, country_result=len(country_result), total=len(result)) 
                     cls.slackAlert(alert_msg)
 
-                    #db.insert(country_result)
+                    db.insert(country_result)
 
                 db.closeConnection()
                 cls.slackAlert(" *** Finished!! \n")

@@ -67,18 +67,19 @@ class DBManager:
         cursor.close()
 
     @classmethod
-    def getCountryLatest(cls, country, chart_type, duration):
+    def getCountryLatest(cls, chart_type, country, duration):
         conn = cls.__postgres_store
         cursor = conn.cursor()
 
         query_sql = "SELECT timestp FROM spotify_chart \
-            WHERE country=%s, chart_type=%s, duration=%s ORDER BY id DESC LIMIT 1;"
+            WHERE country=%s and chart_type=%s and duration=%s ORDER BY id DESC LIMIT 1;"
 
         query_data = (country, chart_type, duration,)
-
         cursor.execute(query_sql, query_data)
         records = cursor.fetchone()
-        print(records)
+        date = records[0]
+        cursor.close()
+        return date
 
     @classmethod
     def initializeTable(cls, conn):
