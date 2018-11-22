@@ -53,16 +53,14 @@ def main(argv=None):
     scraper = Scraper()
     extractor = Extractor()
 
-    # country_dict가 사라짐
-
-    country_dict = extractor.extractCountryList(chart_type_opts, duration_opts)
+    country_dict = extractor.extractCountryDict(chart_type_opts, duration_opts)
     
     if scrape_all_option == True:
-        scraper.scrapeAllData(chart_type_opts, duration_opts, country_dict)
+        scraper.scrapingAllData(chart_type_opts, duration_opts, country_dict)
     elif scrape_latest_option == True:
-        scraper.scrapeLatestData(chart_type_opts, duration_opts, country_dict)
+        scraper.scrapingLatestData(chart_type_opts, duration_opts, country_dict)
     elif scrape_confirm_option == True:
-        scraper.scrapeConfirm(chart_type_opts, duration_opts, country_dict)
+        scraper.scrapingConfirm(chart_type_opts, duration_opts, country_dict)
 
 if __name__ == "__main__":
     sys.exit(main())
