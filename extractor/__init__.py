@@ -7,39 +7,42 @@ from bs4 import BeautifulSoup
 class Extractor:
 
     @classmethod
-    def extractCountryList(cls, chart_type_opts, duration_opts):
-        for chart_type in chart_type_opts:
-            for duration in duration_opts:
-                country_key = chart_type+"_"+duration
-                country_list = []
+    def extractCountryList(cls, chart_type, duration):
+        '''
+        return country_list : html tag (us, vn...)
+        '''
 
-                url="https://spotifycharts.com/{}/global/weekly/latest".format(chart_type)
-                req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        country_list = []
 
-                webpage_byte = urlopen(req).read()
+        url="https://spotifycharts.com/{}/global/weekly/latest".format(chart_type)
+        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
 
-                webpage = webpage_byte.decode('utf-8')
-                soup = BeautifulSoup(webpage, 'html.parser')
+        webpage_byte = urlopen(req).read()
 
-                for child in soup.find("div",{"data-type":"country"}).children:
-                    try:
-                        country_tags = child.find_all('li')
-                        if country_tags:
-                            for country_tag in country_tags:
-                                country = country_tag['data-value']
-                                country_list.append(country)
-                    except:
-                        continue
-                
-                country_list = list(set(country_list))
-                country_list.sort()
+        webpage = webpage_byte.decode('utf-8')
+        soup = BeautifulSoup(webpage, 'html.parser')
 
-                country_dic[country_key] = country_list
+        for child in soup.find("div",{"data-type":"country"}).children:
+            try:
+                country_tags = child.find_all('li')
+                if country_tags:
+                    for country_tag in country_tags:
+                        country = country_tag['data-value']
+                        country_list.append(country)
+            except:
+                continue
 
-        return country_dic
+        country_list = list(set(country_list))
+        country_list.sort()
+
+        return country_list
 
     @classmethod
-    def extractCountryName(cls, chart_type, country, duration):
+    def extractCountryHtmlText(cls, chart_type, country, duration):
+        '''
+        return country : html text (Global, Viet Nam ....)
+        '''
+
         url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
         req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         country = None
@@ -62,7 +65,13 @@ class Extractor:
 
     @classmethod
     def extractDateList(cls, chart_type, country, duration):
+        ''' 
+        return date_list : html tag ( 2018-01-15--2018-01-22....)
+        '''
+
         date_list = []
+
+        print(chart_type, country, duration)
 
         url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
         req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -91,40 +100,72 @@ class Extractor:
         return date_list
 
     @classmethod
-    def updateDateList(cls, chart_type, country, duration, previous_date):
-        date_list = []
-        prev_year = previous_date.split('-')[0]
-        prev_month = previous_date.split('-')[1]
-        prev_date = previous_date.split('-')[2]
+    def extractDateHtmlTextList(cls, chart_type, country, duration):
+        '''
+        return date_list : html text ( 01/15/2018...)
+        '''
 
-        previous_date = prev_month+"/"+prev_date+"/"+prev_year
+        date_list = []
 
         url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
         req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        
+
         try:
             webpage_byte = urlopen(req).read()
 
             webpage = webpage_byte.decode('utf-8')
             soup = BeautifulSoup(webpage, 'html.parser')
-        
+            
             for child in soup.find("div",{"data-type":"date"}).children:
                 try:
                     date_tags = child.find_all('li')
                     if date_tags:
                         for date_tag in date_tags:
-                            if previous_date == date_tag.text:
-                                break
-                            date = date_tag['data-value']
+                            date = date_tag.text 
                             date_list.append(date)
                 except:
                     continue
         except:
-            return date_list            
-        
+            return date_list
+
         date_list = list(set(date_list))
         date_list.sort()
+        date_list = cls.formatDateDB(date_list)
 
         return date_list
 
+    @classmethod
+    def formatDateDB(cls, date_list):
+        ''' 
+        Date html text -> DB column 
+        '''
+
+        db_date_list = []
+
+        for date in date_list:
+            html_month = date.split('/')[0]
+            html_date = date.split('/')[1]
+            html_year = date.split('/')[2]
     
+            db_date = html_year+'-'+html_month+'-'+html_date
+            db_date_list.append(db_date)
+
+        return db_date_list
+    
+    @classmethod
+    def formatDateHtmlText(cls, date_list):
+        '''
+        DB column -> Date html text
+        '''
+
+        html_date_list = []
+
+        for date in date_list:
+            db_year = previous_date.split('-')[0]
+            db_month = previous_date.split('-')[1]
+            db_date = previous_date.split('-')[2]
+
+            html_date = db_month+"/"+db_date+"/"+db_year
+            html_date_list.append(html_date)
+        
+        return html_date_list

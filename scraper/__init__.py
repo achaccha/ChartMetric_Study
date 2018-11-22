@@ -43,7 +43,7 @@ class Scraper:
                 country_list = country_dict[chart_type+"_"+duration]
                 for country in country_list:
 
-                    alert_msg = "<<<<<Scraping Start : {chart_type}_{country}_{duration}>>>>>\n"\
+                    alert_msg = ">>>>>Scraping Start : {chart_type}_{country}_{duration}>>>>>\n"\
                         .format(chart_type=chart_type, country=country, duration=duration) 
                     cls.slackAlert(alert_msg)
                     
@@ -53,7 +53,7 @@ class Scraper:
                     db.insertData(country_result)
                     total = db.getTotalData()
 
-                    alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {country_result}, Total result : {total}\n"\
+                    alert_msg = "<<<<<Scraping End : {chart_type}_{country}_{duration}, Country result : {country_result}, Total result : {total}\n"\
                         .format(chart_type=chart_type, country=country, duration=duration, country_result=len(country_result), total=total) 
                     cls.slackAlert(alert_msg)
 
@@ -71,22 +71,29 @@ class Scraper:
         for chart_type in chart_type_opts:
             for duration in duration_opts:
                 country_list = country_dict[chart_type+"_"+duration]
+                country_list = ['vn']
                 for country in country_list:
 
-                    alert_msg = "<<<<<Scraping Start : {chart_type}_{country}_{duration}>>>>>\n"\
+                    alert_msg = ">>>>>Scraping Start : {chart_type}_{country}_{duration}>>>>>\n"\
                         .format(chart_type=chart_type, country=country, duration=duration) 
                     cls.slackAlert(alert_msg)
                     
+                    date_list = extractor.extractDateList(chart_type, country, duration)
                     country_name = extractor.extractCountryName(chart_type, country, duration)
-                    previous_date = str(db.getLatestDate(chart_type, country_name, duration))
-                    date_list = extractor.updateDateList(chart_type, country, duration, previous_date)
+                    previous_date = db.getLatestDate(chart_type, country_name, duration)
+                    
+                    print(json.dumps(date_list, indent=4))
+                    print(previous_date)
 
-                    country_result = cls.scraping(chart_type, country, duration, date_list)
+                    previous_index = date_list.index(previous_date)
+                    print(len(date_list), previous_index)
 
-                    db.insertData(country_result)
+                    #country_result = cls.scraping(chart_type, country, duration, date_list)
+
+                    #db.insertData(country_result)
                     total = db.getTotalData()
 
-                    alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {country_result}, Total result : {total}\n"\
+                    alert_msg = "<<<<<Scraping End : {chart_type}_{country}_{duration}, Country result : {country_result}, Total result : {total}\n"\
                         .format(chart_type=chart_type, country=country, duration=duration, country_result=len(country_result), total=total) 
                     cls.slackAlert(alert_msg)
 
@@ -103,21 +110,23 @@ class Scraper:
         for chart_type in chart_type_opts:
             for duration in duration_opts:
                 country_list = country_dict[chart_type+"_"+duration]
+                country_list = ['vn']
                 for country in country_list:
 
-                    alert_msg = "<<<<<Scraping Start : {chart_type}_{country}_{duration}>>>>>\n"\
+                    alert_msg = ">>>>>Scraping Start : {chart_type}_{country}_{duration}>>>>>\n"\
                         .format(chart_type=chart_type, country=country, duration=duration) 
                     cls.slackAlert(alert_msg)
                     
-                    date_list = extractor.extractDateList(chart_type, country, duration)
+                    date_list = extractor.extractDateNameList(chart_type, country, duration)
                     update_date_list = db.getDateList(chart_type, country, duration, date_list)
+                    print(json.dumps(update_date_list, indent=4))
 
                     country_result = cls.scraping(chart_type, country, duration, update_date_list)
-
-                    db.insertData(country_result)
+                    print(json.dumps(country_result, indent=4))
+                    #db.insertData(country_result)
                     total = db.getTotalData()
 
-                    alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {country_result}, Total result : {total}\n"\
+                    alert_msg = "<<<<<Scraping End : {chart_type}_{country}_{duration}, Country result : {country_result}, Total result : {total}\n"\
                         .format(chart_type=chart_type, country=country, duration=duration, country_result=len(country_result), total=total) 
                     cls.slackAlert(alert_msg)
 

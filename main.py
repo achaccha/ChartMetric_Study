@@ -53,6 +53,8 @@ def main(argv=None):
     scraper = Scraper()
     extractor = Extractor()
 
+    # country_dict가 사라짐
+
     country_dict = extractor.extractCountryList(chart_type_opts, duration_opts)
     
     if scrape_all_option == True:

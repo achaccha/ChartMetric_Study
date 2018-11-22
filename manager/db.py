@@ -52,6 +52,7 @@ class DBManager:
             query_data = (date, country, chart_type, duration,)
             cursor.execute(query_sql, query_data)
             records = cursor.fetchone()
+            print(records)
             exist = records[0]
             if exist == 0:
                 update_date_list.append(date)
@@ -70,7 +71,7 @@ class DBManager:
         query_data = (country, chart_type, duration,)
         cursor.execute(query_sql, query_data)
         records = cursor.fetchone()
-        date = records[0]
+        date = str(records[0])
         
         cursor.close()
         return date
