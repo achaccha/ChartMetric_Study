@@ -48,12 +48,12 @@ class Extractor:
         return country_list
 
     @classmethod
-    def extractCountryText(cls, chart_type, country, duration):
+    def countryTagToText(cls, chart_type, country, duration):
         '''
         return country : html text (Global, Viet Nam ....)
         '''
 
-        country = None
+        country_text = None
 
         url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
         req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -66,14 +66,14 @@ class Extractor:
 
             for child in soup.find("div",{"data-type":"country"}).children:
                 try:
-                    date_tag = child.find('li', {"class":"selected"})
-                    country = date_tag.text
+                    country_tag = child.find('li', {"class":"selected"})
+                    country_text = country_tag.text
                 except:
                     continue
         except:
-            return country
+            return country_text
 
-        return country
+        return country_text
 
     @classmethod
     def extractDateTagList(cls, chart_type, country, duration):
@@ -142,8 +142,6 @@ class Extractor:
         date_list.sort()
 
         return date_list
-
-
 
     @classmethod
     def dateTextToTagList(cls, chart_type, country, duration, date_text_list):

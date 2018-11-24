@@ -43,20 +43,17 @@ class DBManager:
     def getDateList(cls, chart_type, country, duration, date_list):
         conn = cls.__postgres_store
         cursor = conn.cursor()
-        update_date_list = []
+       
+        query_sql = "SELECT timestp FROM spotify_chart \
+            WHERE chart_type=%s and country=%s and duration=%s \
+            GROUP BY timestp;"
 
-        for date in date_list:
-            query_sql = "SELECT COUNT(*) FROM spotify_chart \
-                WHERE rank=1 and timestp=%s and country=%s and chart_type=%s and duration=%s;"
+        query_data = (chart_type, country, duration,)
+        cursor.execute(query_sql, query_data)
 
-            query_data = (date, country, chart_type, duration,)
-            cursor.execute(query_sql, query_data)
-            records = cursor.fetchone()
-            print(records)
-            exist = records[0]
-            if exist == 0:
-                update_date_list.append(date)
-
+        records = cursor.fetchall()
+        update_date_list = [str(record[0]) for record in records]
+        
         cursor.close()
         return update_date_list
 
@@ -65,13 +62,18 @@ class DBManager:
         conn = cls.__postgres_store
         cursor = conn.cursor()
 
-        query_sql = "SELECT timestp FROM spotify_chart \
-            WHERE country=%s and chart_type=%s and duration=%s ORDER BY id DESC LIMIT 1;"
+        query_sql = "SELECT DISTINCT timestp FROM spotify_chart \
+            WHERE country=%s and chart_type=%s and duration=%s"
 
         query_data = (country, chart_type, duration,)
         cursor.execute(query_sql, query_data)
-        records = cursor.fetchone()
-        date = str(records[0])
+        records = cursor.fetchall()
+        date_list = [str(record[0]) for record in records]
+        date_list.sort(reverse=True)
+        if date_list:
+            date = date_list[0]
+        else:
+            date = -1
         
         cursor.close()
         return date
@@ -81,7 +83,9 @@ class DBManager:
         conn = cls.__postgres_store
         cursor = conn.cursor()
 
-        query_sql = "SELECT id FROM spotify_chart ORDER BY id DESC LIMIT 1;"
+        query_sql = "SELECT id FROM spotify_chart\
+                ORDER BY id DESC LIMIT 1;"
+        
         cursor.execute(query_sql)
         records = cursor.fetchone()
         total = records[0]
@@ -116,3 +120,26 @@ class DBManager:
     def closeConnection(cls):
         cls.__postgres_store.close()
         return True
+    
+    
+    @classmethod
+    def isDuplicate(cls):
+        conn = cls.__postgres_store
+        cursor = conn.cursor()
+        
+        query_sql = "SELECT spotify_track_id, rank, timestp, country, chart_type, duration, count(*) \
+            from spotify_chart \
+            group by spotify_track_id, rank, timestp, country, chart_type, duration \
+            having count(*) > 1;"
+
+        cursor.execute(query_sql)
+        records = cursor.fetchone()
+
+        conn.commit()
+        cursor.close()
+
+        if records == None:
+            return False
+        else:
+            return True
+        

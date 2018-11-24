@@ -15,10 +15,11 @@ def main(argv=None):
     scrape_all_option = True
     scrape_latest_option = False
     scrape_confirm_option = False
+    check_duplicate = False
     
     # get arguments
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'harvwdlc', ['help', 'all', 'regional', 'viral', 'weekly', 'daily', 'latest', 'confirm'])
+        opts, args = getopt.getopt(sys.argv[1:], 'harvwdlcp', ['help', 'all', 'regional', 'viral', 'weekly', 'daily', 'latest', 'check', 'duplicate'])
     except getopt.GetoptError as err:
         print (err)
         sys.exit(1)
@@ -44,9 +45,13 @@ def main(argv=None):
             scrape_all_option = False
             scrape_latest_option = True
 
-        elif o in ('-c', '--confirm'):
+        elif o in ('-c', '--check'):
             scrape_all_option = False
             scrape_confirm_option = True
+        
+        elif o in ('-p', '--duplicate'):
+            check_duplicate = True
+            scrape_all_option = False
         else:
             assert False, 'unhandled option'
     
@@ -60,7 +65,10 @@ def main(argv=None):
     elif scrape_latest_option == True:
         scraper.scrapingLatestData(chart_type_opts, duration_opts, country_dict)
     elif scrape_confirm_option == True:
-        scraper.scrapingConfirm(chart_type_opts, duration_opts, country_dict)
+        scraper.scrapingCheck(chart_type_opts, duration_opts, country_dict)
+
+    if check_duplicate == True:
+        scraper.checkDuplicate()
 
 if __name__ == "__main__":
     sys.exit(main())
