@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 class DateConverter:
 
-	@classmethod
+    @classmethod
     def dateTextToTag(cls, chart_type, country, duration, date_text):
         '''
         return date_tag ( ex) 2018-01-15--2018-01-22)
@@ -37,7 +37,7 @@ class DateConverter:
 
         return date_tag
 
-	@classmethod
+    @classmethod
     def dateTextToTagList(cls, chart_type, country, duration, date_text_list):
         '''
         return date_list : html text ( 01/15/2018...)
@@ -102,21 +102,21 @@ class DateConverter:
         
         return html_date_list
 
-	@classmethod
-	def dateTextToDBList(cls, date_list):
-		''' 
-		Date html text -> DB column 
-		'''
+    @classmethod
+    def dateTextToDBList(cls, date_list):
+        ''' 
+        Date html text -> DB column 
+        '''
 
-		db_date_list = []
+        db_date_list = []
 
-		for date in date_list:
+        for date in date_list:
             html_month = date.split('/')[0]
             html_date = date.split('/')[1]
             html_year = date.split('/')[2]
-    
-            db_date = html_year+'-'+html_month+'-'+html_date
-            db_date_list.append(db_date)
+
+        db_date = html_year+'-'+html_month+'-'+html_date
+        db_date_list.append(db_date)
 
         return db_date_list
 

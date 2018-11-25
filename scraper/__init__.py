@@ -23,7 +23,7 @@ from urllib.error import HTTPError
 from socket import error as SocketError
 
 from converter.countryConverter import CountryConverter
-from coverter.dateConverter import DateConverter
+from converter.dateConverter import DateConverter
 
 from extractor.dateExtractor import DateExtractor
 
@@ -182,7 +182,7 @@ class Scraper:
                     
                     result = cls.scraping(chart_type, country, duration, date_tag_list)
 
-                    db.insertData(result)
+                    #db.insertData(result)
                     total = db.getTotalData()
 
                     alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {result}, Total result : {total}\n"\
@@ -285,6 +285,8 @@ class Scraper:
     @classmethod
     def checkDuplicate(cls):
         db = DBManager()
+        cls.slackAlert("==================Checking Duplicate==================")
+        
         duplicate = db.isDuplicate()
 
         if duplicate == True:
@@ -293,4 +295,5 @@ class Scraper:
             cls.slackAlert("No duplicate data in database!!")
 
 
+        cls.slackAlert("======================================================")
         db.closeConnection()

@@ -11,8 +11,8 @@ def main(argv=None):
 
     chart_type_opts = ['regional', 'viral']
     duration_opts = ['weekly', 'daily']
-    scrape_all_option = True
-    scrape_latest_option = False
+    scrape_all_option = False
+    scrape_latest_option = True
     scrape_confirm_option = False
     check_duplicate = False
     
@@ -40,17 +40,18 @@ def main(argv=None):
         elif o in ('-d', '--daily'):
             duration_opts = ['daily']
 
-        elif o in ('-l', '--latest'):
-            scrape_all_option = False
-            scrape_latest_option = True
-
+        elif o in ('-a', '--all'):
+            scraping_latest_option = False
+            scraping_all_option = True
+        
         elif o in ('-c', '--check'):
-            scrape_all_option = False
+            scrape_latest_option = False
             scrape_confirm_option = True
         
         elif o in ('-p', '--duplicate'):
             check_duplicate = True
-            scrape_all_option = False
+            scrape_latest_option = False
+        
         else:
             assert False, 'unhandled option'
     

@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 class CountryConverter:
 	
-	@classmethod
+    @classmethod
     def countryTagToText(cls, chart_type, country, duration):
         '''
         return country : html text (Global, Viet Nam ....)
