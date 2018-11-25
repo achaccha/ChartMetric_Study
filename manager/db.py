@@ -40,7 +40,7 @@ class DBManager:
         return cls.__postgres_store
 
     @classmethod
-    def getDateList(cls, chart_type, country, duration, date_list):
+    def getDateList(cls, chart_type, country, duration):
         conn = cls.__postgres_store
         cursor = conn.cursor()
        

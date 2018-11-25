@@ -3,9 +3,8 @@ import os
 import sys
 import json
 
-from extractor import Extractor
+from extractor.countryExtractor import CountryExtractor
 from scraper import Scraper
-from manager.db import DBManager
 
 # Main function
 def main(argv=None):
@@ -55,10 +54,10 @@ def main(argv=None):
         else:
             assert False, 'unhandled option'
     
+    country_extractor = CountryExtractor()
     scraper = Scraper()
-    extractor = Extractor()
-
-    country_dict = extractor.extractCountryDict(chart_type_opts, duration_opts)
+    
+    country_dict = country_extractor.extractCountryDict(chart_type_opts, duration_opts)
     
     if scrape_all_option == True:
         scraper.scrapingAllData(chart_type_opts, duration_opts, country_dict)
