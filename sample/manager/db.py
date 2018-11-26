@@ -25,25 +25,19 @@ class DBManager:
         cls.__postgres_store = psycopg2.connect(connect_str)
 
     @classmethod
-    def getPostgres(cls):
-        if cls.__postgres_store == None:
-            cls.__init_postgres()
-        
-        return cls.__postgres_store
-
-    @classmethod
-    def closeConnection(cls):
-        cls.__postgres_store.close()
-        return True
-
-
-    @classmethod
     def initializeTable(cls, conn):
         cursor = conn.cursor()
         initialize_sql = "TRUNCATE TABLE spotify_chart restart identity;"
         cursor.execute(initialize_sql)
 
         return True
+
+    @classmethod
+    def getPostgres(cls):
+        if cls.__postgres_store == None:
+            cls.__init_postgres()
+        
+        return cls.__postgres_store
 
     @classmethod
     def getDateList(cls, chart_type, country, duration):
@@ -73,10 +67,12 @@ class DBManager:
 
         query_data = (country, chart_type, duration,)
         cursor.execute(query_sql, query_data)
-
         records = cursor.fetchall()
-        date_list = [str(record[0]) for record in records]
-        
+        #date_list = [str(record[0]) for record in records]
+        for record in records:
+            print(record[0])
+            print(type(record[0]))
+            
         date_list.sort(reverse=True)
         if date_list:
             date = date_list[0]
@@ -124,7 +120,10 @@ class DBManager:
 
         cursor.close()
 
-    
+    @classmethod
+    def closeConnection(cls):
+        cls.__postgres_store.close()
+        return True
     
     
     @classmethod

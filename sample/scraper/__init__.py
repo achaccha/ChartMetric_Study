@@ -32,47 +32,42 @@ from manager.db import DBManager
 class Scraper:
 
     @classmethod
+    def __new__(cls, self, opts):
+        cls.scrapingData(opts)
+
+    @classmethod
     def slackAlert(cls, msg):
         link = "https://hooks.slack.com/services/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"
         data = "{\"text\": \"%MSG%\"}".replace("%MSG%", msg)
         os.system("curl -X POST -H 'Content-type: application/json' --data '{data}' {link}".format(data=data, link=link))
-
+    
     @classmethod
-    def scrapingAllData(cls, chart_type_opts, duration_opts, country_dict):
+    def scrapingData(cls, opts):
         db = DBManager()
-        date_extractor = DateExtractor()
+        
+        chart_type_list = opts['chart_type']
+        duration_list = opts['duration']
+        country_list = opts['country']
+        date_list = opts['date']
 
-        for chart_type in chart_type_opts:
-            for duration in duration_opts:
+        for chart_type in chart_type_list:
+            for duration in duration_list:
                 # Get country list from country_dict based on chart_type and duration
-                country_list = country_dict[chart_type+"_"+duration]
+                if opts['country'] == None:
+                    country_list = opts['country'][chart_type+"_"+duration]
 
                 for country in country_list:
-
-                    alert_msg = ">>>>>Scraping Start : {chart_type}_{country}_{duration}\n"\
-                        .format(chart_type=chart_type, country=country, duration=duration) 
-                    cls.slackAlert(alert_msg)
+                    date_tag_list = DateExtractor(chart_type, country, duration)
+                    if opts['date'] == None:
+                        date_list = date_tag_list
                     
-                    # Extract each date tag list based on {chart_type, country, duration}
-                    date_tag_list = date_extractor.extractDateTagList(chart_type, country, duration)
-                    
-                    # Scraping based on {chart_type, country, duration, date_tag_list}
-                    result = cls.scraping(chart_type, country, duration, date_tag_list)
+                    date_db = db.getLatestDate(chart_type, country_text, duration)
 
-                    # Insert country's scraping data into DB
-                    db.insertData(result)
+                        
 
-                    # Get total DB data count
-                    total = db.getTotalData()
+                    #result = cls.scraping(chart_type, country, duration, opts['date'])
 
-                    alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {result}, Total result : {total}\n"\
-                        .format(chart_type=chart_type, country=country, duration=duration, result=len(result), total=total) 
-                    cls.slackAlert(alert_msg)
-
-                db.closeConnection()
-                cls.slackAlert(" ******** Finished!! ******** \n")
-        
-        return True
+        db.closeConnection()
 
 
     @classmethod
@@ -133,10 +128,10 @@ class Scraper:
                     alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {result}, Total result : {total}\n"\
                         .format(chart_type=chart_type, country=country, duration=duration, result=len(result), total=total) 
                     cls.slackAlert(alert_msg)
+                
+        cls.slackAlert(" ******** Finished!! ******** \n")
+        db.closeConnection()
 
-                db.closeConnection()
-                cls.slackAlert(" ******** Finished!! ******** \n")
-        
         return True
 
     @classmethod
@@ -171,7 +166,7 @@ class Scraper:
 
                     # Update date list with no data
                     update_date_db_list = list(set(date_text_list)-set(update_date_text_list))
-                    update_date_db_list.sort()c
+                    update_date_db_list.sort()
 
                     # Convert date text list to date tag list based on {chart_type, country, duration, update_date_db_list}
                     date_tag_list = date_converter.dateTextToTagList(chart_type, country, duration, update_date_db_list)
@@ -200,11 +195,11 @@ class Scraper:
 
         country_result = []
 
-        http_csv = open("./csv/"+chart_type+"_"+duration+"_http.csv", 'a')
-        empty_csv = open("./csv/"+chart_type+"_"+duration+"_empty.csv", 'a')
+        #http_csv = open("./csv/"+chart_type+"_"+duration+"_http.csv", 'a')
+        #empty_csv = open("./csv/"+chart_type+"_"+duration+"_empty.csv", 'a')
 
-        http_wr = csv.writer(http_csv)
-        empty_wr = csv.writer(empty_csv)    
+        #http_wr = csv.writer(http_csv)
+        #empty_wr = csv.writer(empty_csv)    
 
         for date in date_list:
             url = "https://spotifycharts.com/{chart_type}/{country}/{duration}/{date}"\
@@ -258,7 +253,7 @@ class Scraper:
                             continue
 
             except HTTPError as e:
-                http_wr.writerow([chart_type, country, duration, date])
+                #http_wr.writerow([chart_type, country, duration, date])
 
                 if e.getcode() == 500:
                     content = e.read()
@@ -274,11 +269,11 @@ class Scraper:
                 
                 print(e.getcode())
 
-        http_wr.writerow([">>>>>>"])
-        empty_wr.writerow([">>>>>>"])
+        #http_wr.writerow([">>>>>>"])
+        #empty_wr.writerow([">>>>>>"])
 
-        http_csv.close()
-        empty_csv.close()
+        #http_csv.close()
+        #empty_csv.close()
 
         return country_result
 

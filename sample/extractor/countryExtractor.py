@@ -6,10 +6,14 @@ from bs4 import BeautifulSoup
 class CountryExtractor:
 
     @classmethod
-    def extractCountryDict(cls, chart_type_opts, duration_opts):
+    def __new__(cls, self, opts):
+        return cls.extractCountryDict(opts)
+
+    @classmethod
+    def extractCountryDict(cls, opts):
         country_dict = {}
-        for chart_type in chart_type_opts:
-            for duration in duration_opts:
+        for chart_type in opts['chart_type']:
+            for duration in opts['duration']:
                 country_key = chart_type+"_"+duration
                 country_dict[country_key] = cls.extractCountryTagList(chart_type, duration)
 
