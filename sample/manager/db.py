@@ -1,4 +1,5 @@
 from config import Config
+from dateutil.parser import parse
 import os
 import psycopg2
 
@@ -68,11 +69,8 @@ class DBManager:
         query_data = (country, chart_type, duration,)
         cursor.execute(query_sql, query_data)
         records = cursor.fetchall()
-        #date_list = [str(record[0]) for record in records]
-        for record in records:
-            print(record[0])
-            print(type(record[0]))
-            
+        date_list = [parse(str(record[0])).date() for record in records]
+        
         date_list.sort(reverse=True)
         if date_list:
             date = date_list[0]

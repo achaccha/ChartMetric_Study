@@ -171,7 +171,7 @@ class Scraper:
 
                     # Update date list with no data
                     update_date_db_list = list(set(date_text_list)-set(update_date_text_list))
-                    update_date_db_list.sort()c
+                    update_date_db_list.sort()
 
                     # Convert date text list to date tag list based on {chart_type, country, duration, update_date_db_list}
                     date_tag_list = date_converter.dateTextToTagList(chart_type, country, duration, update_date_db_list)
@@ -182,7 +182,7 @@ class Scraper:
                     
                     result = cls.scraping(chart_type, country, duration, date_tag_list)
 
-                    #db.insertData(result)
+                    db.insertData(result)
                     total = db.getTotalData()
 
                     alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {result}, Total result : {total}\n"\
