@@ -1,6 +1,4 @@
-import datetime
 import json
-from dateutil.parser import parse
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from bs4 import BeautifulSoup
@@ -8,21 +6,11 @@ from bs4 import BeautifulSoup
 class DateConverter:
 
     @classmethod
-    def dateTextToTag(cls, chart_type, duration, date):
+    def dateTextToTag(cls, chart_type, country, duration, date_text):
         '''
         return date_tag ( ex) 2018-01-15--2018-01-22)
         '''
-        
-        if chart_type == 'regional' and duration == 'weekly':
-            date_tag = str(date-datetime.timedelta(days=6))+"--"+str(date+datetime.timedelta(days=1))
-        elif chart_type == 'viral' and duration == 'weekly':
-            date_tag = str(date)+"--"+str(date)
-        else:
-            date_tag = str(date)
 
-        return date_tag
-
-        '''
         date_tag = None
 
         url="https://spotifycharts.com/{}/{}/{}/latest".format(chart_type, country, duration)
@@ -39,7 +27,7 @@ class DateConverter:
                     date_tags = child.find_all('li')
                     if date_tags:
                         for tag in date_tags:
-                            if parse(tag.text) == parse(str(date)):
+                            if tag.text == date_text:
                                 date_tag = tag['data-value']
                                 return date_tag
                 except:
@@ -48,7 +36,6 @@ class DateConverter:
             return date_tag
 
         return date_tag
-        '''
 
     @classmethod
     def dateTextToTagList(cls, chart_type, country, duration, date_text_list):

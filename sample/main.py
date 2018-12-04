@@ -18,39 +18,16 @@ def main(argv=None):
     parser.add_argument('--duration', nargs='*', default=['weekly', 'daily'])
     parser.add_argument('--country', nargs='+')
     parser.add_argument('--date', nargs='+')
-    
-    parser.add_argument('--insert', action='store_true')
-    parser.add_argument('--update', action='store_true')
-    parser.add_argument('--delete', action='store_true')
+    parser.add_argument('--dbaction', choices=['insert','update','delete','query'] )
 
-    parser.add_argument('--set', nargs='+')
-    
     args = parser.parse_args()
 
     opts["chart_type"] = args.chart
     opts["duration"] = args.duration
     opts["country"] = args.country
     opts["date"] = args.date
+    opts["db_action"] = args.dbaction
 
-    opts["insert"] = args.insert
-    opts["update"] = args.update
-    opts["delete"] = args.delete
-
-    opts["set"] = args.set
-    opts["set_key"] = []
-    opts["set_value"] = []
-
-    if opts["set"]:
-        if len(opts["set"]) % 2 == 1:
-            print("There are key-value pairs that are not matched. Please try again")
-            sys.exit()
-        else:
-            for arg in opts['set']:
-                if opts['set'].index(arg) % 2 == 0:
-                    opts["set_key"].append(arg)
-                else:
-                    opts["set_value"].append(arg)
-    
     if opts["country"] == None:
         opts["country"] = Config.country
     

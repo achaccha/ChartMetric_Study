@@ -23,6 +23,8 @@ class CountryExtractor:
     def extractCountryTagList(cls, chart_type, duration):
         '''
         return country_list : html tag (us, vn...)
+
+        * url을 request하는게 비효율적
         '''
 
         country_list = []
