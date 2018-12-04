@@ -7,6 +7,8 @@ CREATE TABLE spotify_chart (
   country 					text not null,
   chart_type 				text not null,
   duration 					text not null
+
+  # 10186998
 );
 '''
 import csv
@@ -59,18 +61,31 @@ class Scraper:
         
         # DB Update
         if opts['update']:
+
             if opts['set']:
                 where_str = ""
                 set_str = ""
 
+                where_list = []
+                set_list = []
+
+                for index in range(len(opts['set_key'])):
+                    set_str += opts['set_key'][index] + "= %s"
+                    set_list.append(opts['set_value'][index])
+
+                    if index != len(opts['set_key'])-1:
+                        set_str += ','
+
                 if len(opts['chart_type']) != 2:
-                    where_str += "chart_type = '"+opts['chart_type'][0] + "'"
+                    where_str += "chart_type = %s"
+                    where_list.append(opts['chart_type'][0])
                 
                 if len(opts['duration']) != 2:
                     if where_str != "":
                         where_str += " and "
                 
-                    where_str += "duration = '"+opts['duration'][0] + "'"
+                    where_str += "duration = %s"
+                    where_list.append(opts['duration'][0])
                     
                 if opts['country'] != None:
                     if where_str != "":
@@ -79,7 +94,8 @@ class Scraper:
                     for country in country_list:
                         index = country_list.index(country)
                         country_name = pycountry.countries.get(alpha_2=country.upper()).name
-                        where_str += "country= '" + country_name + "'"
+                        where_str += "country = %s"
+                        where_list.append(country_name)
                         
                         if index != len(country_list)-1:
                             where_str += " or "
@@ -91,22 +107,24 @@ class Scraper:
                     for date in date_list:
                         index = date_list.index(date)
                         date = str(parse(date).date())
-                        where_str += "date= '" + date + "'"
-                        
+                        where_str += "date = %s"
+                        where_list.append(date)
+
                         if index != len(date_list)-1:
                             where_str += " or "
 
-                for index in range(len(opts['set_key'])):
-                    set_str = set_str + opts['set_key'][index] + '=' + opts['set_value'][index]
-                    if index != len(opts['set_key'])-1:
-                        set_str += ','
-                
-                '''
-                if where_str == "":
-                    set all db list
-                else:
-                    set db list according to where 
-                '''
+                #conn = db.getPostgres()
+                #cursor = conn.cursor()
+
+                update_data = tuple(set_list + where_list)
+                update_sql = "UPDATE spotify_chart SET " + set_str
+
+                # DB Update
+                if where_str != "":
+                    update_sql += "WHERE " + where_str
+
+                #cursor.execute(update_sql, update_data)
+                #conn.commit()
 
             else:
                 for chart_type in chart_type_list:
@@ -122,35 +140,49 @@ class Scraper:
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
 
-                                query_sql = "SELECT min(id), max(id) from spotify_chart \
-                                        WHERE chart_type=%s and duration=%s and country=%s and timestp=%s;"
+                                query_sql = """SELECT min(id), max(id) 
+                                    FROM spotify_chart
+                                    WHERE chart_type=%s and duration=%s and country=%s and timestp=%s;"""
                                 
                                 query_data = (chart_type, duration, country_name, date,)
                                 cursor.execute(query_sql, query_data)
                                 records = cursor.fetchall()
 
+                                min_id = records[0][0]
+                                max_id = records[0][1]
+
+                                '''
+                                # In this case there are no data.
+                                if min_id == None or max_id == None:
+                                    print("In this case, there are no data in DB.")
+                                    cursor.close()
+                                    break
+
+                                result = cls.scraping(chart_type, country, duration, date)
                                 
+                                # New data has benn created, so you need to confirm.
+                                if max_id-min_id+1 != len(result):
+                                    print("There are some extra data. Please check it.")
+                                    cursor.close()
+                                    break
 
-            '''
-            ##### db.updateData()
-            conn = db.getPostgres()
-            cursor = conn.cursor()
+                                current_id = min_id
+                                for item in result:
 
-            insert_data = (spotify_track_id, rank, timestp, country, chart_type, duration,)
+                                    spotify_track_id = item[0]
+                                    rank = item[1]
 
-            update_sql = "UPDATE spotify_chart \
-                SET %s \
-                WHERE %s;"
-            
-            cursor.execute(insert_sql, insert_data)
-            conn.commit()
+                                    update_sql = """UPDATE spotify_chart 
+                                        SET spotify_track_id=(%s), rank=(%s)
+                                        WHERE id=(%s);"""
 
-            cursor.close()
-            '''
+                                    update_data = (spotify_track_id, rank, current_id,)
 
-        # DB Delete
-        #elif opts['delete']:
-        #    continue
+                                    #cursor.execute(update_sql, update_data)
+                                    #conn.commit()
+
+                                    current_id += 1
+                                '''
         
         # DB Insert
         elif opts['insert']:
@@ -211,28 +243,38 @@ class Scraper:
 
                         for date in date_tag_list:
                             result = cls.scraping(chart_type, country, duration, date)
+
+                            for item in result:
                         
-                            '''
-                            ##### db.insertData()
-                            conn = db.getPostgres()
-                            cursor = conn.cursor()
+                                '''
+                                ##### db.insertData()
+                                conn = db.getPostgres()
+                                cursor = conn.cursor()
 
-                            spotify_track_id = item[0]
-                            rank = item[1]
-                            timestp = item[2]
-                            country = item[3]
-                            chart_type = item[4]
-                            duration = item[5]
+                                spotify_track_id = item[0]
+                                rank = item[1]
+                                timestp = item[2]
+                                country = item[3]
+                                chart_type = item[4]
+                                duration = item[5]
 
-                            insert_data = (spotify_track_id, rank, timestp, country, chart_type, duration,)
+                                insert_data = (spotify_track_id, rank, timestp, country, chart_type, duration,)
 
-                            insert_sql = "INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration) \
-                                VALUES (%s, %s, %s, %s, %s, %s);"
+                                if chart_type = 'regional':
+                                    streams = item[6]
+                                    insert_data = insert_data + (streams,)
 
-                            cursor.execute(insert_sql, insert_data)
-                            conn.commit()
+                                    insert_sql = "INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration, streams) \
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s);"
 
-                        cursor.close()
+                                else:
+                                    insert_sql = "INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration) \
+                                    VALUES (%s, %s, %s, %s, %s, %s);"
+
+                                cursor.execute(insert_sql, insert_data)
+                                conn.commit()
+
+                            cursor.close()
                         '''
                         #total = db.getTotalData()
 
@@ -241,6 +283,10 @@ class Scraper:
                         #cls.slackAlert(alert_msg)
 
         
+        # DB Delete
+        #elif opts['delete']:
+        #    continue
+
         db.closeConnection()
 
 
@@ -265,7 +311,7 @@ class Scraper:
 
             soup = BeautifulSoup(webpage, 'html.parser')
 
-            # This {chart+type, country, duration, date} is empty
+            # This {chart_type, country, duration, date} is empty
             chart_error = soup.find_all('div', {'class':'chart-error'})
                             
             if chart_error:
@@ -298,8 +344,13 @@ class Scraper:
                         spotify_country = first_info_list[0]
                         spotify_duration = first_info_list[1]
                         spotify_timestp = first_info_list[2]
-                        
+
                         spotify_list = [spotify_track_id, int(spotify_rank), spotify_timestp, spotify_country, spotify_chart_type, spotify_duration]
+
+                        if chart_type = 'reigonal':
+                            spotify_stream =  info.find('td', {'class':'chart-table-streams'}).text
+                        
+                        spotify_list.append(int(spotify_stream))
                         result.append(spotify_list)
 
                     except:
