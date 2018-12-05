@@ -12,7 +12,8 @@ class Config:
         'password' : os.environ.get("PASSWORD")
     }
 
-    table = os.environ.get("TABLE")
+    #table = os.environ.get("TABLE") 
+    table = "spotify_chart"
 
     country = {
     	# 65

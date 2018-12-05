@@ -11,6 +11,39 @@ CREATE TABLE spotify_chart (
   # 10186998
 );
 '''
+INSERT_SPOTIFY_CHART_QUERY="INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration, streams) \
+                        VALUES (%s, %s, %s, %s, %s, %s, %s);"
+
+INSERT_SPOTIFY_CHART_QUERY_WITH_STREAMS="INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration) \
+                        VALUES (%s, %s, %s, %s, %s, %s);"
+
+SELECT_DATE_QUERY="SELECT DISTINCT timestp \
+            FROM spotify_chart \
+            WHERE country=%s and chart_type=%s and duration=%s"
+
+SELECT_ID_RANGE_QUERY="SELECT min(id), max(id) \
+                FROM spotify_chart \
+                WHERE chart_type=%s and duration=%s and country=%s and timestp=%s;"
+
+SELECT_MAX_ID_QUERY="SELECT id FROM spotify_chart \
+                ORDER BY id DESC LIMIT 1;"
+
+SELECT_DUPLICATE_QUERY="SELECT spotify_track_id, rank, timestp, country, chart_type, duration, count(*) \
+            FROM spotify_chart \
+            GROUP BY spotify_track_id, rank, timestp, country, chart_type, duration \
+            HAVING count(*) > 1;"
+
+UPDATE_SPOTIFY_CHART_SET_CLAUSE="UPDATE spotify_chart SET "
+
+UPDATE_SPOTIFY_CHART_NO_SET_CLAUSE="UPDATE spotify_chart \
+                SET spotify_track_id=(%s), rank=(%s) \
+                WHERE id=(%s);"
+
+UPDATE_SPOTIFY_CHART_NO_SET_CLAUSE_WITH_STREAMS="UPDATE spotify_chart \
+                                            SET spotify_track_id=(%s), rank=(%s), streams=(%s) \
+                                            WHERE id=(%s);"
+
+
 import csv
 import datetime
 import errno
@@ -52,7 +85,6 @@ class Scraper:
     @classmethod
     def scrapingData(cls, opts):
         db = DBManager()
-
         date_converter = DateConverter()
 
         chart_type_list = opts['chart_type']
@@ -66,6 +98,9 @@ class Scraper:
         if opts['update']:
 
             if opts['set']:
+                conn = db.getPostgres()
+                cursor = conn.cursor()
+
                 where_str = ""
                 set_str = ""
 
@@ -96,11 +131,11 @@ class Scraper:
                     
                     for country in country_list:
                         index = country_list.index(country)
-                        if country == 'global':
-                            country_name = 'Global'
+                        if country == "global":
+                            country_name = "Global"
                         else:
                             country_name = pycountry.countries.get(alpha_2=country.upper()).name
-                            country_name = country_name.split(",")[0]
+                            country_name = country_name.split(',')[0]
 
                         where_str += "country = %s"
                         where_list.append(country_name)
@@ -121,17 +156,12 @@ class Scraper:
                         if index != len(date_list)-1:
                             where_str += " or "
 
-                conn = db.getPostgres()
-                cursor = conn.cursor()
-
                 update_data = tuple(set_list + where_list)
-                update_sql = "UPDATE spotify_chart SET " + set_str
+                update_sql = UPDATE_SPOTIFY_CHART_SET_CLAUSE + set_str
 
                 # DB Update
                 if where_str != "":
                     update_sql += " WHERE " + where_str
-
-                update_sql += ";"
 
                 cursor.execute(update_sql, update_data)
                 conn.commit()
@@ -154,24 +184,22 @@ class Scraper:
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
 
-                                query_sql = """SELECT DISTINCT timestp 
-                                    FROM spotify_chart
-                                    WHERE country=%s and chart_type=%s and duration=%s;"""
-
+                                query_sql = SELECT_DATE_QUERY
                                 query_data = (country_name, chart_type, duration,)
                                 cursor.execute(query_sql, query_data)
                                 records = cursor.fetchall()
+                                
                                 date_list = [parse(str(record[0])).date() for record in records]
 
+                            alert_msg = ">>>>> UPDATING START : {chart_type}/{country}/{duration}"
+                                .format(chart_type=chart_type, country=country, duration=duration)
+                            cls.slackAlert(alert_msg)
+
                             for date in date_list:
-                                print(chart_type + "/" + country + "/" + duration + "/" + str(date))
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
 
-                                query_sql = """SELECT min(id), max(id) 
-                                    FROM spotify_chart
-                                    WHERE chart_type=%s and duration=%s and country=%s and timestp=%s;"""
-                                
+                                query_sql = SELECT_ID_RANGE_QUERY
                                 query_data = (chart_type, duration, country_name, date,)
                                 cursor.execute(query_sql, query_data)
                                 records = cursor.fetchall()
@@ -181,7 +209,10 @@ class Scraper:
                                 
                                 # In this case there are no data.
                                 if min_id == None or max_id == None:
-                                    print("In this case, there are no data in DB.")
+                                    alert_msg = ">>>>> There are no data in DB: {chart_type}/{country}/{duration}/{date}"
+                                        .format(chart_type=chart_type, country=country, duration=duration, date=date)
+                                    cls.slackAlert(alert_msg)
+                                    
                                     cursor.close()
                                     continue
                                 
@@ -189,8 +220,11 @@ class Scraper:
                                 result = cls.scraping(chart_type, country, duration, date_tag)
 
                                 # New data has benn created, so you need to confirm.
-                                if max_id-min_id+1 != len(result):
-                                    print(chart_type + "/" + country + "/" + duration + "/" + str(date) + ":There are some extra data. Please check it.")
+                                if (max_id-min_id)+1 != len(result):
+                                    alert_msg = ">>>>> There are some extra data! Please check it! : {chart_type}/{country}/{duration}/{date}"
+                                        .format(chart_type=chart_type, country=country, duration=duration, date=date_tag)
+                                    cls.slackAlert(alert_msg)
+                                    
                                     cursor.close()
                                     continue
 
@@ -199,28 +233,24 @@ class Scraper:
                                     spotify_track_id = item[0]
                                     rank = item[1]
                                     
-                                    if len(item) == 7:
+                                    if len(item) != 7:
+                                        update_sql = UPDATE_SPOTIFY_CHART_NO_SET_CLAUSE
+                                        update_data = (spotify_track_id, rank, current_id,)
+                                    else:
                                         streams = item[6]
                                         
-                                        update_sql = """UPDATE spotify_chart 
-                                            SET spotify_track_id=(%s), rank=(%s), streams=(%s)
-                                            WHERE id=(%s);"""
-                                        
+                                        update_sql = UPDATE_SPOTIFY_CHART_NO_SET_CLAUSE_WITH_STREAMS
                                         update_data = (spotify_track_id, rank, streams, current_id,)
-
-                                    else:
-                                        update_sql = """UPDATE spotify_chart
-                                            SET spotify_track_id=(%s), rank=(%s)
-                                            WHERE id=(%s);"""
-
-                                        update_data = (spotify_track_id, rank, current_id,)
-                                    
+                                        
                                     cursor.execute(update_sql, update_data)
                                     conn.commit()
                                     
                                     current_id += 1
+
+                            alert_msg = ">>>>> UPDATING END : {chart_type}/{country}/{duration}"
+                                .format(chart_type=chart_type, country=country, duration=duration)
+                            cls.slackAlert(alert_msg)
                                 
-        
         # DB Insert
         elif opts['insert']:
             for chart_type in chart_type_list:
@@ -238,19 +268,18 @@ class Scraper:
 
                         alert_msg = ">>>>>Scraping Start : {chart_type}_{country}_{duration}\n"\
                             .format(chart_type=chart_type, country=country, duration=duration)
-                        #cls.slackAlert(alert_msg)
+                        cls.slackAlert(alert_msg)
                         
                         # Default : scraping latest data
                         if opts['date'] == None: 
                             conn = db.getPostgres()
                             cursor = conn.cursor()
 
-                            query_sql = "SELECT DISTINCT timestp FROM spotify_chart \
-                                WHERE country=%s and chart_type=%s and duration=%s"
-
+                            query_sql = SELECT_DATE_QUERY
                             query_data = (country_name, chart_type, duration,)
                             cursor.execute(query_sql, query_data)
                             records = cursor.fetchall()
+                            
                             date_list = [parse(str(record[0])).date() for record in records]
 
                             date_list.sort(reverse=True)
@@ -271,22 +300,18 @@ class Scraper:
                         else:
                             date_tag_list = []
                             for date in opts['date']:
-                                #if "~" in date:
                                 date = parse(date).date()
                                 date_tag = date_converter.dateTextToTag(chart_type, duration, date)
                                 date_tag_list.append(date_tag)
                         
                         alert_msg = "***** New Date List in {chart_type}_{country}_{duration} : {latest_date_list}\n"\
                             .format(chart_type=chart_type, country=country, duration=duration, latest_date_list=date_tag_list)
-                        #cls.slackAlert(alert_msg)
+                        cls.slackAlert(alert_msg)
 
                         for date in date_tag_list:
                             result = cls.scraping(chart_type, country, duration, date)
 
                             for item in result:
-                        
-                                '''
-                                ##### db.insertData()
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
 
@@ -301,29 +326,36 @@ class Scraper:
 
                                 if len(result) == 7:
                                     streams = item[6]
-                                    insert_data = insert_data + (streams,)
 
-                                    insert_sql = "INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration, streams) \
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s);"
+                                    insert_data = insert_data + (streams,)
+                                    insert_sql = INSERT_SPOTIFY_CHART_QUERY
 
                                 else:
-                                    insert_sql = "INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration) \
-                                    VALUES (%s, %s, %s, %s, %s, %s);"
+                                    insert_sql = INSERT_SPOTIFY_CHART_QUERY_WITH_STREAMS
 
                                 cursor.execute(insert_sql, insert_data)
                                 conn.commit()
 
                             cursor.close()
-                        '''
-                        #total = db.getTotalData()
 
-                        alert_msg = ">>>>>Scraping End : {chart_type}_{country}_{duration}, Country result : {result}, Total result : {total}\n"\
+
+                        conn = db.getPostgres()
+                        cursor = conn.cursor()
+
+                        query_sql = SELECT_MAX_ID_QUERY
+                        cursor.execute(query_sql)
+                        records = cursor.fetchone()
+                        total = records[0]
+
+                        cursor.close()
+
+                        alert_msg = ">>>>>Scraping End : {chart_type}/{country}/{duration}, Country result : {result}, Total result : {total}\n"\
                             .format(chart_type=chart_type, country=country, duration=duration, result=len(result), total=total)
-                        #cls.slackAlert(alert_msg)
+                        cls.slackAlert(alert_msg)
 
         
         # DB Delete
-        #elif opts['delete']:
+        # elif opts['delete']:
         #    continue
 
         db.closeConnection()
@@ -427,11 +459,20 @@ class Scraper:
     @classmethod
     def checkDuplicate(cls):
         db = DBManager()
-        cls.slackAlert("==================Checking Duplicate==================")
-        
-        duplicate = db.isDuplicate()
 
-        if duplicate == True:
+        cls.slackAlert("==================Checking Duplicate==================")
+
+        conn = db.getPostgres()
+        cursor = conn.cursor()
+        
+        query_sql = SELECT_DUPLICATE_QUERY
+        cursor.execute(query_sql)
+        records = cursor.fetchone()
+
+        conn.commit()
+        cursor.close()
+
+        if records != None:
             cls.slackAlert("Some duplicate data in database!!")
         else:
             cls.slackAlert("No duplicate data in database!!")

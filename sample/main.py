@@ -54,7 +54,6 @@ def main(argv=None):
     if opts["country"] == None:
         opts["country"] = Config.country
    
-    print("hi")
     Scraper(opts)
 
     '''
