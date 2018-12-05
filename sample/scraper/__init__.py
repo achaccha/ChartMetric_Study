@@ -15,6 +15,7 @@ import csv
 import datetime
 import errno
 import json
+import locale
 import os
 import pycountry
 import sys
@@ -33,6 +34,8 @@ from converter.dateConverter import DateConverter
 from extractor.dateExtractor import DateExtractor
 
 from manager.db import DBManager
+
+locale.setlocale( locale.LC_ALL, 'en_US.UTF-8' ) 
 
 class Scraper:
 
@@ -86,14 +89,19 @@ class Scraper:
                 
                     where_str += "duration = %s"
                     where_list.append(opts['duration'][0])
-                    
-                if opts['country'] != None:
+                
+                if type(opts['country']) != dict: 
                     if where_str != "":
                         where_str += " and "
                     
                     for country in country_list:
                         index = country_list.index(country)
-                        country_name = pycountry.countries.get(alpha_2=country.upper()).name
+                        if country == 'global':
+                            country_name = 'Global'
+                        else:
+                            country_name = pycountry.countries.get(alpha_2=country.upper()).name
+                            country_name = country_name.split(",")[0]
+
                         where_str += "country = %s"
                         where_list.append(country_name)
                         
@@ -107,24 +115,26 @@ class Scraper:
                     for date in date_list:
                         index = date_list.index(date)
                         date = str(parse(date).date())
-                        where_str += "date = %s"
+                        where_str += "timestp = %s"
                         where_list.append(date)
 
                         if index != len(date_list)-1:
                             where_str += " or "
 
-                #conn = db.getPostgres()
-                #cursor = conn.cursor()
+                conn = db.getPostgres()
+                cursor = conn.cursor()
 
                 update_data = tuple(set_list + where_list)
                 update_sql = "UPDATE spotify_chart SET " + set_str
 
                 # DB Update
                 if where_str != "":
-                    update_sql += "WHERE " + where_str
+                    update_sql += " WHERE " + where_str
 
-                #cursor.execute(update_sql, update_data)
-                #conn.commit()
+                update_sql += ";"
+
+                cursor.execute(update_sql, update_data)
+                conn.commit()
 
             else:
                 for chart_type in chart_type_list:
@@ -134,9 +144,27 @@ class Scraper:
                             country_list = opts['country'][chart_type+"_"+duration]
 
                         for country in country_list:
-                            country_name = pycountry.countries.get(alpha_2=country.upper()).name
+                            if country == 'global':
+                                country_name = 'Global'
+                            else:
+                                country_name = pycountry.countries.get(alpha_2=country.upper()).name
+                                country_name = country_name.split(",")[0]
                             
+                            if opts['date'] == None:
+                                conn = db.getPostgres()
+                                cursor = conn.cursor()
+
+                                query_sql = """SELECT DISTINCT timestp 
+                                    FROM spotify_chart
+                                    WHERE country=%s and chart_type=%s and duration=%s;"""
+
+                                query_data = (country_name, chart_type, duration,)
+                                cursor.execute(query_sql, query_data)
+                                records = cursor.fetchall()
+                                date_list = [parse(str(record[0])).date() for record in records]
+
                             for date in date_list:
+                                print(chart_type + "/" + country + "/" + duration + "/" + str(date))
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
 
@@ -150,39 +178,48 @@ class Scraper:
 
                                 min_id = records[0][0]
                                 max_id = records[0][1]
-
-                                '''
+                                
                                 # In this case there are no data.
                                 if min_id == None or max_id == None:
                                     print("In this case, there are no data in DB.")
                                     cursor.close()
-                                    break
-
-                                result = cls.scraping(chart_type, country, duration, date)
+                                    continue
                                 
+                                date_tag = date_converter.dateTextToTag(chart_type, duration, date)
+                                result = cls.scraping(chart_type, country, duration, date_tag)
+
                                 # New data has benn created, so you need to confirm.
                                 if max_id-min_id+1 != len(result):
-                                    print("There are some extra data. Please check it.")
+                                    print(chart_type + "/" + country + "/" + duration + "/" + str(date) + ":There are some extra data. Please check it.")
                                     cursor.close()
-                                    break
+                                    continue
 
                                 current_id = min_id
                                 for item in result:
-
                                     spotify_track_id = item[0]
                                     rank = item[1]
+                                    
+                                    if len(item) == 7:
+                                        streams = item[6]
+                                        
+                                        update_sql = """UPDATE spotify_chart 
+                                            SET spotify_track_id=(%s), rank=(%s), streams=(%s)
+                                            WHERE id=(%s);"""
+                                        
+                                        update_data = (spotify_track_id, rank, streams, current_id,)
 
-                                    update_sql = """UPDATE spotify_chart 
-                                        SET spotify_track_id=(%s), rank=(%s)
-                                        WHERE id=(%s);"""
+                                    else:
+                                        update_sql = """UPDATE spotify_chart
+                                            SET spotify_track_id=(%s), rank=(%s)
+                                            WHERE id=(%s);"""
 
-                                    update_data = (spotify_track_id, rank, current_id,)
-
-                                    #cursor.execute(update_sql, update_data)
-                                    #conn.commit()
-
+                                        update_data = (spotify_track_id, rank, current_id,)
+                                    
+                                    cursor.execute(update_sql, update_data)
+                                    conn.commit()
+                                    
                                     current_id += 1
-                                '''
+                                
         
         # DB Insert
         elif opts['insert']:
@@ -193,17 +230,18 @@ class Scraper:
                         country_list = opts['country'][chart_type+"_"+duration]
                     
                     for country in country_list:
-                        country_name = pycountry.countries.get(alpha_2=country.upper()).name
+                        if country == 'global':
+                            country_name = 'Global'
+                        else:
+                            country_name = pycountry.countries.get(alpha_2=country.upper()).name
+                            country_name = country_name.split(",")[0]
 
-                        
                         alert_msg = ">>>>>Scraping Start : {chart_type}_{country}_{duration}\n"\
                             .format(chart_type=chart_type, country=country, duration=duration)
                         #cls.slackAlert(alert_msg)
                         
                         # Default : scraping latest data
-                        if opts['date'] == None:
-                            date_tag_list = DateExtractor(chart_type, country, duration)
-                            
+                        if opts['date'] == None: 
                             conn = db.getPostgres()
                             cursor = conn.cursor()
 
@@ -224,6 +262,7 @@ class Scraper:
                             
                             cursor.close()
 
+                            date_tag_list = DateExtractor(chart_type, country, duration)
                             date_tag = date_converter.dateTextToTag(chart_type, duration, date_db)
 
                             date_tag_index = date_tag_list.index(date_tag)
@@ -260,7 +299,7 @@ class Scraper:
 
                                 insert_data = (spotify_track_id, rank, timestp, country, chart_type, duration,)
 
-                                if chart_type = 'regional':
+                                if len(result) == 7:
                                     streams = item[6]
                                     insert_data = insert_data + (streams,)
 
@@ -293,7 +332,7 @@ class Scraper:
     @classmethod
     def scraping(cls, chart_type, country, duration, date):
 
-        country_result = []
+        result = []
 
         #http_csv = open("./csv/"+chart_type+"_"+duration+"_http.csv", 'a')
         #empty_csv = open("./csv/"+chart_type+"_"+duration+"_empty.csv", 'a')
@@ -315,14 +354,17 @@ class Scraper:
             chart_error = soup.find_all('div', {'class':'chart-error'})
                             
             if chart_error:
-                empty_wr.writerow([chart_type, country, duration, date])
-                continue
-            
+                #empty_wr.writerow([chart_type, country, duration, date])
+                raise
+
             # Extract selected country, duration, date
             first_info = soup.find_all('li', {'class':'selected'})
             
             # Extract url to get spotify_track_id, rank 
             second_info  = soup.find_all('tr')
+
+            # Extract streaming data
+            stream_info =  soup.find_all('td', {'class':'chart-table-streams'})
 
             first_info_list = []
             
@@ -347,14 +389,15 @@ class Scraper:
 
                         spotify_list = [spotify_track_id, int(spotify_rank), spotify_timestp, spotify_country, spotify_chart_type, spotify_duration]
 
-                        if chart_type = 'reigonal':
-                            spotify_stream =  info.find('td', {'class':'chart-table-streams'}).text
-                        
-                        spotify_list.append(int(spotify_stream))
                         result.append(spotify_list)
 
                     except:
                         continue
+            
+            if stream_info and len(result) == len(stream_info):
+                for idx in range(len(stream_info)):
+                    spotify_stream = locale.atoi(stream_info[idx].text)
+                    result[idx].append(spotify_stream)
 
         except HTTPError as e:
             #http_wr.writerow([chart_type, country, duration, date])
@@ -378,7 +421,7 @@ class Scraper:
 
         #http_csv.close()
         #empty_csv.close()
-
+       
         return result
 
     @classmethod

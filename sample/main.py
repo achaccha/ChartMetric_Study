@@ -23,7 +23,7 @@ def main(argv=None):
     parser.add_argument('--update', action='store_true')
     parser.add_argument('--delete', action='store_true')
 
-    parser.add_argument('--set', nargs='+')
+    parser.add_argument('--set', nargs='*')
     
     args = parser.parse_args()
 
@@ -53,7 +53,8 @@ def main(argv=None):
     
     if opts["country"] == None:
         opts["country"] = Config.country
-    
+   
+    print("hi")
     Scraper(opts)
 
     '''
