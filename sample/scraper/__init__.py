@@ -1,16 +1,3 @@
-'''
-CREATE TABLE spotify_chart (
-  id              			serial primary key,
-  spotify_track_id			text not null,
-  rank 						integer not null,
-  timestp					date not null,
-  country 					text not null,
-  chart_type 				text not null,
-  duration 					text not null
-
-  # 10186998
-);
-'''
 INSERT_SPOTIFY_CHART_QUERY="INSERT INTO spotify_chart (spotify_track_id, rank, timestp, country, chart_type, duration, streams) \
                         VALUES (%s, %s, %s, %s, %s, %s, %s);"
 
@@ -61,11 +48,8 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from socket import error as SocketError
 
-from converter.countryConverter import CountryConverter
-from converter.dateConverter import DateConverter
-
+from config import Config
 from extractor.dateExtractor import DateExtractor
-
 from manager.db import DBManager
 
 locale.setlocale( locale.LC_ALL, 'en_US.UTF-8' ) 
@@ -85,7 +69,6 @@ class Scraper:
     @classmethod
     def scrapingData(cls, opts):
         db = DBManager()
-        date_converter = DateConverter()
 
         chart_type_list = opts['chart_type']
         duration_list = opts['duration']
@@ -131,11 +114,7 @@ class Scraper:
                     
                     for country in country_list:
                         index = country_list.index(country)
-                        if country == "global":
-                            country_name = "Global"
-                        else:
-                            country_name = pycountry.countries.get(alpha_2=country.upper()).name
-                            country_name = country_name.split(',')[0]
+                        country_name = Config.country_dict[country]
 
                         where_str += "country = %s"
                         where_list.append(country_name)
@@ -174,15 +153,12 @@ class Scraper:
                             country_list = opts['country'][chart_type+"_"+duration]
 
                         for country in country_list:
-                            if country == 'global':
-                                country_name = 'Global'
-                            else:
-                                country_name = pycountry.countries.get(alpha_2=country.upper()).name
-                                country_name = country_name.split(",")[0]
+                            country_name = Config.country_dict[country]
                             
                             if opts['date'] == None:
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
+                                print(country_name, chart_type, duration)
 
                                 query_sql = SELECT_DATE_QUERY
                                 query_data = (country_name, chart_type, duration,)
@@ -191,7 +167,7 @@ class Scraper:
                                 
                                 date_list = [parse(str(record[0])).date() for record in records]
 
-                            alert_msg = ">>>>> UPDATING START : {chart_type}/{country}/{duration}"
+                            alert_msg = ">>>>> UPDATING START : {chart_type}/{country}/{duration}" \
                                 .format(chart_type=chart_type, country=country, duration=duration)
                             cls.slackAlert(alert_msg)
 
@@ -207,21 +183,21 @@ class Scraper:
                                 min_id = records[0][0]
                                 max_id = records[0][1]
                                 
-                                # In this case there are no data.
+                                # In this case there are no data in DB
                                 if min_id == None or max_id == None:
-                                    alert_msg = ">>>>> There are no data in DB: {chart_type}/{country}/{duration}/{date}"
+                                    alert_msg = ">>>>> There are no data in DB: {chart_type}/{country}/{duration}/{date}" \
                                         .format(chart_type=chart_type, country=country, duration=duration, date=date)
                                     cls.slackAlert(alert_msg)
                                     
                                     cursor.close()
                                     continue
                                 
-                                date_tag = date_converter.dateTextToTag(chart_type, duration, date)
+                                date_tag = DateExtractor.dateTextToTag(chart_type, duration, date)
                                 result = cls.scraping(chart_type, country, duration, date_tag)
 
-                                # New data has benn created, so you need to confirm.
+                                # The number of data currently scraped and the number of data in DB are different.
                                 if (max_id-min_id)+1 != len(result):
-                                    alert_msg = ">>>>> There are some extra data! Please check it! : {chart_type}/{country}/{duration}/{date}"
+                                    alert_msg = ">>>>> Please check it! : {chart_type}/{country}/{duration}/{date}" \
                                         .format(chart_type=chart_type, country=country, duration=duration, date=date_tag)
                                     cls.slackAlert(alert_msg)
                                     
@@ -247,7 +223,7 @@ class Scraper:
                                     
                                     current_id += 1
 
-                            alert_msg = ">>>>> UPDATING END : {chart_type}/{country}/{duration}"
+                            alert_msg = ">>>>> UPDATING END : {chart_type}/{country}/{duration}" \
                                 .format(chart_type=chart_type, country=country, duration=duration)
                             cls.slackAlert(alert_msg)
                                 
@@ -260,15 +236,13 @@ class Scraper:
                         country_list = opts['country'][chart_type+"_"+duration]
                     
                     for country in country_list:
-                        if country == 'global':
-                            country_name = 'Global'
-                        else:
-                            country_name = pycountry.countries.get(alpha_2=country.upper()).name
-                            country_name = country_name.split(",")[0]
+                        cls.slackAlert("===========================================================================================") 
 
-                        alert_msg = ">>>>>Scraping Start : {chart_type}_{country}_{duration}\n"\
+                        alert_msg = ">>>>>Scraping Start : {chart_type}/{country}/{duration}\n"\
                             .format(chart_type=chart_type, country=country, duration=duration)
                         cls.slackAlert(alert_msg)
+                        
+                        country_name = Config.country_dict[country]
                         
                         # Default : scraping latest data
                         if opts['date'] == None: 
@@ -287,12 +261,17 @@ class Scraper:
                             if date_list:
                                 date_db = date_list[0]
                             else:
+                                cls.slackAlert("***** No Data in this condition... *****")
                                 continue
                             
                             cursor.close()
 
                             date_tag_list = DateExtractor(chart_type, country, duration)
-                            date_tag = date_converter.dateTextToTag(chart_type, duration, date_db)
+                            if date_tag_list == []:
+                                cls.slackAlert("***** There are some connection Error to get date_tag_list!!! Please check it.")
+                                continue
+                            
+                            date_tag = DateExtractor.dateTextToTag(chart_type, duration, date_db)
 
                             date_tag_index = date_tag_list.index(date_tag)
                             date_tag_list = date_tag_list[date_tag_index+1:]
@@ -301,33 +280,42 @@ class Scraper:
                             date_tag_list = []
                             for date in opts['date']:
                                 date = parse(date).date()
-                                date_tag = date_converter.dateTextToTag(chart_type, duration, date)
+                                date_tag = DateExtractor.dateTextToTag(chart_type, duration, date)
                                 date_tag_list.append(date_tag)
                         
-                        alert_msg = "***** New Date List in {chart_type}_{country}_{duration} : {latest_date_list}\n"\
+                        alert_msg = "* New Date List in {chart_type}/{country}/{duration} : {latest_date_list}\n"\
                             .format(chart_type=chart_type, country=country, duration=duration, latest_date_list=date_tag_list)
                         cls.slackAlert(alert_msg)
 
+                        country_result = 0
                         for date in date_tag_list:
                             result = cls.scraping(chart_type, country, duration, date)
-
+                            
+                            if len(result) == 0:
+                                alert_msg = "***** No data in : {chart_type}/{country}/{duration}/{date}\n"\
+                                    .format(chart_type=chart_type, country=country, duration=duration, date=date)
+                                cls.slackAlert(alert_msg)
+                                continue
+                            
+                            country_result += len(result)
+                            
                             for item in result:
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
 
                                 spotify_track_id = item[0]
-                                rank = item[1]
-                                timestp = item[2]
-                                country = item[3]
-                                chart_type = item[4]
-                                duration = item[5]
+                                spotify_rank = item[1]
+                                spotify_timestp = item[2]
+                                spotify_country = item[3]
+                                spotify_chart_type = item[4]
+                                spotify_duration = item[5]
 
-                                insert_data = (spotify_track_id, rank, timestp, country, chart_type, duration,)
+                                insert_data = (spotify_track_id, spotify_rank, spotify_timestp, spotify_country, spotify_chart_type, spotify_duration,)
 
-                                if len(result) == 7:
-                                    streams = item[6]
+                                if len(item) == 7:
+                                    spotify_streams = item[6]
 
-                                    insert_data = insert_data + (streams,)
+                                    insert_data = insert_data + (spotify_streams,)
                                     insert_sql = INSERT_SPOTIFY_CHART_QUERY
 
                                 else:
@@ -337,7 +325,6 @@ class Scraper:
                                 conn.commit()
 
                             cursor.close()
-
 
                         conn = db.getPostgres()
                         cursor = conn.cursor()
@@ -349,9 +336,10 @@ class Scraper:
 
                         cursor.close()
 
-                        alert_msg = ">>>>>Scraping End : {chart_type}/{country}/{duration}, Country result : {result}, Total result : {total}\n"\
-                            .format(chart_type=chart_type, country=country, duration=duration, result=len(result), total=total)
+                        alert_msg = ">>>>>Scraping End : {chart_type}/{country}/{duration}, Country result : {country_result}, Total result : {total}\n"\
+                            .format(chart_type=chart_type, country=country, duration=duration, country_result=country_result, total=total)
                         cls.slackAlert(alert_msg)
+                        cls.slackAlert("===========================================================================================") 
 
         
         # DB Delete
@@ -387,7 +375,7 @@ class Scraper:
                             
             if chart_error:
                 #empty_wr.writerow([chart_type, country, duration, date])
-                raise
+                return result
 
             # Extract selected country, duration, date
             first_info = soup.find_all('li', {'class':'selected'})
@@ -446,8 +434,6 @@ class Scraper:
             if e.errno != errno.ECONNRESET:
                 raise 
             
-            print(e.getcode())
-
         #http_wr.writerow([">>>>>>"])
         #empty_wr.writerow([">>>>>>"])
 

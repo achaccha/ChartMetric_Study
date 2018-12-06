@@ -1,4 +1,7 @@
+import datetime
 import json
+
+from dateutil.parser import parse
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from bs4 import BeautifulSoup
@@ -76,3 +79,20 @@ class DateExtractor:
         date_list.sort()
 
         return date_list
+
+    @classmethod
+    def dateTextToTag(cls, chart_type, duration, date):
+        '''
+        return date_tag ( ex) 2018-01-15--2018-01-22)
+        '''
+        if type(date) == str:
+            date = parse(date).date()
+
+        if chart_type == 'regional' and duration == 'weekly':
+            date_tag = str(date-datetime.timedelta(days=6))+"--"+str(date+datetime.timedelta(days=1))
+        elif chart_type == 'viral' and duration == 'weekly':
+            date_tag = str(date)+"--"+str(date)
+        else:
+            date_tag = str(date)
+
+        return date_tag
