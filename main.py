@@ -25,7 +25,7 @@ def main(argv=None):
 
     parser.add_argument('--set', nargs='*')
 
-    parser.add_argument('--duplicate', action='store_true')
+    #parser.add_argument('--duplicate', action='store_true')
 
     args = parser.parse_args()
 
@@ -57,9 +57,10 @@ def main(argv=None):
         opts["country"] = Config.country
    
     Scraper(opts)
-
-    if args.duplicate:
-        Scraper.checkDuplicate()
+    Scraper.checkDuplicate()
+    
+    #if args.duplicate:
+    #    Scraper.checkDuplicate()
 
 if __name__ == "__main__":
     sys.exit(main())

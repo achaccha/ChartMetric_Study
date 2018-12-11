@@ -80,6 +80,7 @@ class Scraper:
         # DB Update
         if opts['update']:
 
+            # If the user gives the conditions to be used set clause
             if opts['set']:
                 conn = db.getPostgres()
                 cursor = conn.cursor()
@@ -90,6 +91,7 @@ class Scraper:
                 where_list = []
                 set_list = []
 
+                # Create set query string
                 for index in range(len(opts['set_key'])):
                     set_str += opts['set_key'][index] + "= %s"
                     set_list.append(opts['set_value'][index])
@@ -97,6 +99,9 @@ class Scraper:
                     if index != len(opts['set_key'])-1:
                         set_str += ','
 
+                
+                # If the user gives the conditions to be used where clause, create where query string
+                # each of conditions (chart_type, duration, country, date)
                 if len(opts['chart_type']) != 2:
                     where_str += "chart_type = %s"
                     where_list.append(opts['chart_type'][0])
@@ -135,16 +140,19 @@ class Scraper:
                         if index != len(date_list)-1:
                             where_str += " or "
 
+                # create update query sql and data
                 update_data = tuple(set_list + where_list)
                 update_sql = UPDATE_SPOTIFY_CHART_SET_CLAUSE + set_str
 
-                # DB Update
+                # If there is a where string, append it
                 if where_str != "":
                     update_sql += " WHERE " + where_str
 
                 cursor.execute(update_sql, update_data)
                 conn.commit()
 
+            # If the user don't gives the conditions to be used set clause,
+            # Scraper scrape based on where clause. (default : all data scraping)
             else:
                 for chart_type in chart_type_list:
                     for duration in duration_list:
@@ -155,26 +163,32 @@ class Scraper:
                         for country in country_list:
                             country_name = Config.country_dict[country]
                             
+                            # Get date list from DB based on country_name, chart_type, duration.
                             if opts['date'] == None:
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
-                                print(country_name, chart_type, duration)
 
                                 query_sql = SELECT_DATE_QUERY
                                 query_data = (country_name, chart_type, duration,)
                                 cursor.execute(query_sql, query_data)
                                 records = cursor.fetchall()
                                 
-                                date_list = [parse(str(record[0])).date() for record in records]
+                                date_list = [record[0] for record in records]
+
+                            date_list = [parse(str(date)).date() for date in date_list]
+                            date_list.sort(reverse=True)
 
                             alert_msg = ">>>>> UPDATING START : {chart_type}/{country}/{duration}" \
                                 .format(chart_type=chart_type, country=country, duration=duration)
                             cls.slackAlert(alert_msg)
 
+
                             for date in date_list:
                                 conn = db.getPostgres()
                                 cursor = conn.cursor()
 
+                                # Since update must be based on existing one, 
+                                # finds the range of id existing in DB in current condition.
                                 query_sql = SELECT_ID_RANGE_QUERY
                                 query_data = (chart_type, duration, country_name, date,)
                                 cursor.execute(query_sql, query_data)
@@ -183,19 +197,10 @@ class Scraper:
                                 min_id = records[0][0]
                                 max_id = records[0][1]
                                 
-                                # In this case there are no data in DB
-                                if min_id == None or max_id == None:
-                                    alert_msg = ">>>>> There are no data in DB: {chart_type}/{country}/{duration}/{date}" \
-                                        .format(chart_type=chart_type, country=country, duration=duration, date=date)
-                                    cls.slackAlert(alert_msg)
-                                    
-                                    cursor.close()
-                                    continue
-                                
                                 date_tag = DateExtractor.dateTextToTag(chart_type, duration, date)
-                                result = cls.scraping(chart_type, country, duration, date_tag)
+                                result, _, _ = cls.scraping(chart_type, country, duration, date_tag)
 
-                                # The number of data currently scraped and the number of data in DB are different.
+                                # In this case, the number of data currently scraped and the number of data in DB are different.
                                 if (max_id-min_id)+1 != len(result):
                                     alert_msg = ">>>>> Please check it! : {chart_type}/{country}/{duration}/{date}" \
                                         .format(chart_type=chart_type, country=country, duration=duration, date=date_tag)
@@ -209,6 +214,7 @@ class Scraper:
                                     spotify_track_id = item[0]
                                     rank = item[1]
                                     
+                                    # Checking for streams data.
                                     if len(item) != 7:
                                         update_sql = UPDATE_SPOTIFY_CHART_NO_SET_CLAUSE
                                         update_data = (spotify_track_id, rank, current_id,)
@@ -226,9 +232,12 @@ class Scraper:
                             alert_msg = ">>>>> UPDATING END : {chart_type}/{country}/{duration}" \
                                 .format(chart_type=chart_type, country=country, duration=duration)
                             cls.slackAlert(alert_msg)
-                                
+        # DB Update end...
+                    
         # DB Insert
         elif opts['insert']:
+            http_error_list = []
+            empty_error_list = []
             for chart_type in chart_type_list:
                 for duration in duration_list:
                     # Get country list from country_dict based on chart_type and duration
@@ -255,7 +264,6 @@ class Scraper:
                             records = cursor.fetchall()
                             
                             date_list = [parse(str(record[0])).date() for record in records]
-
                             date_list.sort(reverse=True)
                             
                             if date_list:
@@ -283,13 +291,16 @@ class Scraper:
                                 date_tag = DateExtractor.dateTextToTag(chart_type, duration, date)
                                 date_tag_list.append(date_tag)
                         
-                        alert_msg = "* New Date List in {chart_type}/{country}/{duration} : {latest_date_list}\n"\
+                        alert_msg = "* Today's Scraping Date List in {chart_type}/{country}/{duration} : {latest_date_list}\n"\
                             .format(chart_type=chart_type, country=country, duration=duration, latest_date_list=date_tag_list)
                         cls.slackAlert(alert_msg)
 
                         country_result = 0
                         for date in date_tag_list:
-                            result = cls.scraping(chart_type, country, duration, date)
+                            result, http_error, empty_error = cls.scraping(chart_type, country, duration, date)
+                            
+                            http_error_list.append(http_error)
+                            empty_error_list.append(empty_error)
                             
                             if len(result) == 0:
                                 alert_msg = "***** No data in : {chart_type}/{country}/{duration}/{date}\n"\
@@ -341,24 +352,18 @@ class Scraper:
                         cls.slackAlert(alert_msg)
                         cls.slackAlert("===========================================================================================") 
 
-        
-        # DB Delete
-        # elif opts['delete']:
-        #    continue
+            http_error_list = sum(http_error_list, [])
+            empty_error_list = sum(empty_error_list, [])
+            cls.errorReport(http_error_list, empty_error_list)
 
         db.closeConnection()
 
 
     @classmethod
     def scraping(cls, chart_type, country, duration, date):
-
         result = []
-
-        http_csv = open("./csv/"+chart_type+"_"+duration+"_http.csv", 'a')
-        empty_csv = open("./csv/"+chart_type+"_"+duration+"_empty.csv", 'a')
-
-        http_wr = csv.writer(http_csv)
-        empty_wr = csv.writer(empty_csv)    
+        http_error_list = []
+        empty_error_list = []
 
         url = "https://spotifycharts.com/{chart_type}/{country}/{duration}/{date}"\
             .format(chart_type=chart_type, country=country, duration=duration, date=date)
@@ -374,7 +379,7 @@ class Scraper:
             chart_error = soup.find_all('div', {'class':'chart-error'})
                             
             if chart_error:
-                empty_wr.writerow([chart_type, country, duration, date])
+                empty_error_list.append([chart_type, country, duration, date])
                 return result
 
             # Extract selected country, duration, date
@@ -420,27 +425,52 @@ class Scraper:
                     result[idx].append(spotify_stream)
 
         except HTTPError as e:
-            http_wr.writerow([chart_type, country, duration, date])
-
+            http_error_list.append([chart_type, country, duration, date])
+            
             if e.getcode() == 500:
                 content = e.read()
             else:
                 raise
 
         except SocketError as e:
-            alert_msg = '###### SocketError!\n'
-            cls.slackAlert(alert_msg)
+            cls.slackAlert("###### SocketError!\n")
 
             if e.errno != errno.ECONNRESET:
                 raise 
-            
+       
+        return result, http_error_list, empty_error_list
+
+    @classmethod
+    def errorReport(cls, ,http_error_list, empty_error_list):
+        date = strftime("%m%d_%H%M", localtime())
+
+        http_directory = "./csv/http/%s" % date
+        empty_directory = "./csv/empty/%s" % date
+
+        if not os.path.isdir(http_directory):
+            os.makedirs(http_directory)
+
+        if not os.path.isdir(empty_directory):
+            os.makedirs(empty_directory)
+
+        http_csv = open(http_directory+".csv", 'a')
+        empty_csv = open(empty_directory+".csv", 'a')
+
+        http_wr = csv.writer(http_csv)
+        empty_wr = csv.writer(empty_csv)
+
+        for data in http_error_list:
+            http_wr.writerow([data[0], data[1], data[2], data[3]])
+
+        for data in empty_error_list:
+            empty_wr.writerow([data[0], data[1], data[2], data[3]])
+
         http_wr.writerow([">>>>>>"])
         empty_wr.writerow([">>>>>>"])
 
         http_csv.close()
         empty_csv.close()
-       
-        return result
+
 
     @classmethod
     def checkDuplicate(cls):
