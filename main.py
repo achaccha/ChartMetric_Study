@@ -24,7 +24,9 @@ def main(argv=None):
     parser.add_argument('--delete', action='store_true')
 
     parser.add_argument('--set', nargs='*')
-    
+
+    parser.add_argument('--duplicate', action='store_true')
+
     args = parser.parse_args()
 
     opts["chart_type"] = args.chart
@@ -55,7 +57,9 @@ def main(argv=None):
         opts["country"] = Config.country
    
     Scraper(opts)
-    #Scraper.checkDuplicate()
+
+    if args.duplicate:
+        Scraper.checkDuplicate()
 
 if __name__ == "__main__":
     sys.exit(main())
