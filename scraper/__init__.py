@@ -40,6 +40,8 @@ import os
 import pycountry
 import sys
 
+from time import localtime, strftime
+
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 from dateutil.parser import parse
@@ -260,6 +262,7 @@ class Scraper:
 
                             query_sql = SELECT_DATE_QUERY
                             query_data = (country_name, chart_type, duration,)
+                            
                             cursor.execute(query_sql, query_data)
                             records = cursor.fetchall()
                             
@@ -291,14 +294,13 @@ class Scraper:
                                 date_tag = DateExtractor.dateTextToTag(chart_type, duration, date)
                                 date_tag_list.append(date_tag)
                         
-                        alert_msg = "* Today's Scraping Date List in {chart_type}/{country}/{duration} : {latest_date_list}\n"\
+                        alert_msg = "***** Today Scraping Date List in {chart_type}/{country}/{duration} : {latest_date_list}\n"\
                             .format(chart_type=chart_type, country=country, duration=duration, latest_date_list=date_tag_list)
                         cls.slackAlert(alert_msg)
 
                         country_result = 0
                         for date in date_tag_list:
                             result, http_error, empty_error = cls.scraping(chart_type, country, duration, date)
-                            
                             http_error_list.append(http_error)
                             empty_error_list.append(empty_error)
                             
@@ -441,7 +443,7 @@ class Scraper:
         return result, http_error_list, empty_error_list
 
     @classmethod
-    def errorReport(cls, ,http_error_list, empty_error_list):
+    def errorReport(cls,http_error_list, empty_error_list):
         date = strftime("%m%d_%H%M", localtime())
 
         http_directory = "./csv/http/%s" % date
